@@ -29,8 +29,8 @@ import {
   Settings2,
   ShieldCheck,
   Sparkles,
-  Target,
   Trophy,
+  Upload,
   Users,
   WandSparkles,
   X,
@@ -53,6 +53,16 @@ type ActivityItem = {
   progress: number
   goal: string
   accent: string
+}
+
+type ActivityDetailSeriesPoint = {
+  day: string
+  consumption: number
+  consumptionWow: string
+  materials: number
+  materialsWow: string
+  arpu: number
+  arpuWow: string
 }
 
 type Approval = {
@@ -348,7 +358,7 @@ function Topbar({ page, onCreate }: { page: PageKey; onCreate: () => void }) {
           <p>{meta.desc}</p>
         </div>
       </div>
-      {page !== 'dashboard' && (
+      {page !== 'dashboard' && page !== 'activities' && page !== 'rules' && (
         <div className="topbar-actions">
           <label className="global-search">
             <Search size={16} />
@@ -380,32 +390,23 @@ function Dashboard({
     <div className="dashboard-page page-enter">
       <section className="hero-grid">
         <article className="north-star-card">
-          <div className="north-star-head">
-            <span className="soft-label"><Target size={14} /> 北极星指标</span>
-            <button>近 30 天 <ChevronDown size={14} /></button>
-          </div>
           <div className="north-star-main">
             <div>
-              <p>活动牵引消耗</p>
+              <p>近7天活动牵引消耗</p>
               <h2>¥ 1,842,680</h2>
               <span className="metric-change positive"><ArrowUpRight size={14} /> 23.8% 较上周期</span>
             </div>
             <MiniLineChart />
-          </div>
-          <div className="formula-row">
-            <div><small>参与客户</small><strong>4,827</strong><span>×</span></div>
-            <div><small>客均生成量</small><strong>86.4</strong><span>×</span></div>
-            <div><small>投放提升</small><strong>+12.6%</strong></div>
           </div>
         </article>
 
       </section>
 
       <section className="metric-grid">
-        <MetricCard icon={Sparkles} label="在线活动" value="6" unit="场" change="2 场本周新增" tone="violet" />
-        <MetricCard icon={Gift} label="累计发放积分" value="1.284" unit="M" change="+18.2%" tone="mint" />
-        <MetricCard icon={Users} label="活动参与人数" value="4,827" unit="人" change="+620 本周" tone="orange" />
-        <MetricCard icon={Zap} label="目标完成率" value="76.4" unit="%" change="+8.3 pp" tone="blue" />
+        <MetricCard icon={Sparkles} label="在线活动" value="6" unit="场" change="2 场近7天新增" tone="violet" />
+        <MetricCard icon={Gift} label="近7天累计发放积分" value="1.284" unit="M" change="+18.2%" tone="mint" />
+        <MetricCard icon={Users} label="近7天活动累计参与客户数" value="4,827" unit="人" change="+14.7%" tone="orange" />
+        <MetricCard icon={Zap} label="近7天活动累计有消耗素材数" value="18,642" unit="条" change="+8.3%" tone="blue" />
       </section>
 
       <section className="dashboard-main-grid">
@@ -454,25 +455,108 @@ function Dashboard({
           <div className="panel-head">
             <div>
               <span className="section-kicker">CUSTOMER LAYERS</span>
-              <h3>分层参与表现</h3>
+              <h3>分层近7天活动表现</h3>
             </div>
             <button className="ghost-icon"><MoreHorizontal size={18} /></button>
           </div>
-          <div className="layer-bars">
+          <div className="layer-matrix">
+            <div className="layer-matrix-head">
+              <span>层级</span>
+              <span>参与率</span>
+              <span>近7天活动牵引消耗</span>
+              <span>近7天活动有消耗素材</span>
+              <span>近7天活动有消耗素材 ARPU</span>
+            </div>
             {[
-              ['A0', 72, '1,284'], ['A1', 88, '1,562'], ['A2', 61, '906'], ['A3', 45, '624'], ['A4+', 29, '451'],
-            ].map(([label, width, value]) => (
-              <div className="layer-row" key={label}>
-                <span>{label}</span>
-                <div><i style={{ width: `${width}%` }} /></div>
-                <strong>{value}</strong>
+              {
+                layer: 'A0',
+                metrics: [
+                  { value: '24.6%', change: '+3.8%', trend: [16, 17, 18, 20, 21, 23, 24.6] },
+                  { value: '¥328,600', change: '+23.8%', trend: [21, 22, 24, 27, 29, 31, 32.9] },
+                  { value: '4,186', change: '+18.4%', trend: [29, 31, 33, 34, 37, 39, 41.9] },
+                  { value: '¥78.5', change: '+9.6%', trend: [68, 69, 71, 70, 73, 75, 78.5] },
+                ],
+              },
+              {
+                layer: 'A1',
+                metrics: [
+                  { value: '31.8%', change: '+5.2%', trend: [22, 23, 25, 27, 28, 30, 31.8] },
+                  { value: '¥512,400', change: '+31.6%', trend: [31, 33, 36, 42, 45, 48, 51.2] },
+                  { value: '6,920', change: '+27.1%', trend: [44, 48, 50, 56, 61, 65, 69.2] },
+                  { value: '¥74.0', change: '+4.1%', trend: [70, 69, 71, 72, 73, 72, 74] },
+                ],
+              },
+              {
+                layer: 'A2',
+                metrics: [
+                  { value: '18.9%', change: '+2.6%', trend: [15, 16, 15, 17, 18, 18.5, 18.9] },
+                  { value: '¥430,800', change: '+16.2%', trend: [33, 34, 36, 37, 39, 41, 43.1] },
+                  { value: '5,134', change: '+13.5%', trend: [39, 40, 42, 45, 46, 48, 51.3] },
+                  { value: '¥83.9', change: '+7.4%', trend: [76, 77, 78, 80, 79, 82, 83.9] },
+                ],
+              },
+              {
+                layer: 'A3',
+                metrics: [
+                  { value: '12.4%', change: '-1.2%', trend: [14, 13.5, 13.2, 12.8, 13, 12.5, 12.4] },
+                  { value: '¥298,700', change: '+8.9%', trend: [25, 26, 25, 27, 28, 29, 29.9] },
+                  { value: '3,288', change: '+6.8%', trend: [29, 30, 29, 31, 31.5, 32, 32.9] },
+                  { value: '¥90.8', change: '+5.7%', trend: [84, 85, 87, 86, 89, 90, 90.8] },
+                ],
+              },
+              {
+                layer: 'A4+',
+                metrics: [
+                  { value: '8.7%', change: '+0.8%', trend: [7.6, 7.8, 8, 8.1, 8.3, 8.4, 8.7] },
+                  { value: '¥272,180', change: '+11.4%', trend: [21, 22, 24, 25, 25.5, 26, 27.2] },
+                  { value: '2,106', change: '+4.2%', trend: [19, 20, 19.5, 20.2, 20.4, 20.7, 21.1] },
+                  { value: '¥129.2', change: '+14.9%', trend: [101, 105, 110, 113, 119, 124, 129.2] },
+                ],
+              },
+            ].map((row) => (
+              <div className="layer-matrix-row" key={row.layer}>
+                <strong>{row.layer}</strong>
+                {row.metrics.map((metric, index) => (
+                  <div className="layer-metric-cell" key={`${row.layer}-${index}`}>
+                    <span className="layer-metric-top">
+                      <b>{metric.value}</b>
+                      <em className={metric.change.startsWith('-') ? 'negative' : ''}>
+                        {metric.change.startsWith('-') ? <ArrowDownRight size={11} /> : <ArrowUpRight size={11} />}
+                        环比 {metric.change}
+                      </em>
+                    </span>
+                    <LayerSparkline values={metric.trend} />
+                  </div>
+                ))}
               </div>
             ))}
           </div>
-          <p className="insight-note"><Sparkles size={14} /> A1 客户参与最积极，建议下一期加大成长任务曝光。</p>
+          <p className="insight-note"><Sparkles size={14} /> A1 牵引消耗与素材数最高，A4+ 素材 ARPU 更高，可补一档高价值召回任务。</p>
         </article>
       </section>
     </div>
+  )
+}
+
+function LayerSparkline({ values }: { values: number[] }) {
+  const width = 136
+  const height = 34
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  const range = max - min || 1
+  const coords = values.map((value, index) => ({
+    x: (index / (values.length - 1)) * width,
+    y: height - 5 - ((value - min) / range) * 24,
+  }))
+  const linePoints = coords.map((point) => `${point.x},${point.y}`).join(' ')
+  const areaPath = `M ${coords[0].x},${height - 4} L ${coords.map((point) => `${point.x},${point.y}`).join(' L ')} L ${coords[coords.length - 1].x},${height - 4} Z`
+
+  return (
+    <svg className="layer-sparkline" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden="true">
+      <path d={areaPath} />
+      <polyline points={linePoints} />
+      <circle cx={coords[coords.length - 1].x} cy={coords[coords.length - 1].y} r="2.2" />
+    </svg>
   )
 }
 
@@ -531,11 +615,11 @@ function ActivityCalendar() {
       <div className="calendar-corner">全天</div>
       {days.map(([week, date]) => <div className={`calendar-day ${date === '23' ? 'today' : ''}`} key={date}><small>周{week}</small><strong>{date}</strong></div>)}
       <div className="calendar-label">体验任务</div>
-      <div className="calendar-track"><span className="calendar-event event-violet" style={{ left: '0%', width: '71%' }}><WandSparkles size={13} /> Seedance 2.0 尝鲜季</span></div>
+      <div className="calendar-track"><span className="calendar-event event-violet" style={{ left: '0%', width: '71%' }}><WandSparkles size={13} /><span className="calendar-event-name">Seedance 2.0 尝鲜季</span><span className="calendar-event-stat">消耗 ¥328.6k · 周环比 +23.8%</span></span></div>
       <div className="calendar-label">排位赛</div>
-      <div className="calendar-track"><span className="calendar-event event-orange" style={{ left: '0%', width: '86%' }}><Trophy size={13} /> 美妆行业创意排位赛</span></div>
+      <div className="calendar-track"><span className="calendar-event event-orange" style={{ left: '0%', width: '86%' }}><Trophy size={13} /><span className="calendar-event-name">美妆行业创意排位赛</span><span className="calendar-event-stat">参与 986 · 周环比 +14.7%</span></span></div>
       <div className="calendar-label">限时折扣</div>
-      <div className="calendar-track"><span className="calendar-event event-cyan" style={{ left: '43%', width: '43%' }}><Zap size={13} /> 618 模型限时 8 折</span></div>
+      <div className="calendar-track"><span className="calendar-event event-cyan" style={{ left: '43%', width: '43%' }}><Zap size={13} /><span className="calendar-event-name">618 模型限时 8 折</span><span className="calendar-event-stat">素材 18,642 · 周环比 +8.3%</span></span></div>
       <div className="today-line" />
     </div>
   )
@@ -544,16 +628,22 @@ function ActivityCalendar() {
 function ActivitiesPage({ activities, onCreate }: { activities: ActivityItem[]; onCreate: () => void }) {
   const [filter, setFilter] = useState<'全部' | ActivityStatus>('全部')
   const [search, setSearch] = useState('')
+  const [selectedActivity, setSelectedActivity] = useState<ActivityItem | null>(null)
   const shown = activities.filter(
     (item) => (filter === '全部' || item.status === filter) && item.name.toLowerCase().includes(search.toLowerCase()),
   )
+
+  if (selectedActivity) {
+    return <ActivityDetailPage activity={selectedActivity} onBack={() => setSelectedActivity(null)} />
+  }
+
   return (
     <div className="page-enter activities-page">
       <section className="activity-summary-strip">
         <div><span className="summary-icon violet"><Activity size={18} /></span><p><small>本月活动</small><strong>12</strong><em>场</em></p></div>
-        <div><span className="summary-icon mint"><Gift size={18} /></span><p><small>预算锁定</small><strong>92.4</strong><em>万积分</em></p></div>
-        <div><span className="summary-icon orange"><Users size={18} /></span><p><small>覆盖客户</small><strong>8,264</strong><em>UID</em></p></div>
-        <div><span className="summary-icon blue"><ArrowUpRight size={18} /></span><p><small>消耗拉动</small><strong>+23.8</strong><em>%</em></p></div>
+        <div><span className="summary-icon mint"><Gift size={18} /></span><p><small>本月活动锁定</small><strong>92.4</strong><em>万积分</em></p></div>
+        <div><span className="summary-icon orange"><Users size={18} /></span><p><small>本月活动参与用户数</small><strong>8,264</strong><em>UID</em></p></div>
+        <div className="summary-pool-card"><span className="summary-icon blue"><ArrowUpRight size={18} /></span><div className="summary-pool-copy"><div><small>本月活动积分池</small><strong>68%</strong></div><i><em style={{ width: '68%' }} /></i><span>剩余 63.8 万 / 200 万</span></div></div>
       </section>
       <section className="panel activity-table-panel">
         <div className="table-toolbar">
@@ -573,7 +663,19 @@ function ActivitiesPage({ activities, onCreate }: { activities: ActivityItem[]; 
             <span>活动名称</span><span>类型</span><span>活动周期</span><span>积分预算 / 发放</span><span>参与人数</span><span>状态</span><span>负责人</span><span />
           </div>
           {shown.map((item) => (
-            <div className="data-row" key={item.id}>
+            <div
+              className="data-row clickable-row"
+              key={item.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedActivity(item)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter' || event.key === ' ') {
+                  event.preventDefault()
+                  setSelectedActivity(item)
+                }
+              }}
+            >
               <span className="activity-title-cell"><i className={`table-activity-icon ${item.accent}`}>{item.type === '排位赛' ? <Trophy size={17} /> : item.type === '任务类' ? <WandSparkles size={17} /> : <Zap size={17} />}</i><span><strong>{item.name}</strong><small>{item.goal}</small></span></span>
               <span><ActivityTypeTag type={item.type} /></span>
               <span className="muted-cell">{item.range}</span>
@@ -581,7 +683,7 @@ function ActivitiesPage({ activities, onCreate }: { activities: ActivityItem[]; 
               <span className="table-number">{item.people}</span>
               <span><StatusTag status={item.status} /></span>
               <span className="owner-cell"><i>{item.owner.slice(-1)}</i>{item.owner}</span>
-              <span><button className="ghost-icon"><MoreHorizontal size={17} /></button></span>
+              <span><button className="ghost-icon" aria-label="更多操作" onClick={(event) => event.stopPropagation()}><MoreHorizontal size={17} /></button></span>
             </div>
           ))}
         </div>
@@ -589,6 +691,266 @@ function ActivitiesPage({ activities, onCreate }: { activities: ActivityItem[]; 
       </section>
     </div>
   )
+}
+
+function ActivityDetailPage({ activity, onBack }: { activity: ActivityItem; onBack: () => void }) {
+  const detail = getActivityDetail(activity)
+  const pointsValue = Number(activity.points.replace(/[^\d]/g, '')) || 0
+  const issuedRate = activity.status === '已结束' ? 100 : activity.progress
+  const issuedPoints = Math.round(pointsValue * issuedRate / 100)
+  const pointsUsageRate = pointsValue ? Math.round((issuedPoints / pointsValue) * 100) : 0
+  return (
+    <div className="page-enter activity-detail-page">
+      <button className="text-button detail-back-button" onClick={onBack}>
+        <ChevronLeft size={14} /> 返回活动列表
+      </button>
+
+      <section className="activity-detail-hero">
+        <div className="detail-hero-copy">
+          <span className={`table-activity-icon ${activity.accent}`}>{activity.type === '排位赛' ? <Trophy size={18} /> : activity.type === '任务类' ? <WandSparkles size={18} /> : <Zap size={18} />}</span>
+          <div>
+            <div className="detail-title-row">
+              <h2>{activity.name}</h2>
+              <ActivityTypeTag type={activity.type} />
+              <StatusTag status={activity.status} />
+            </div>
+            <p>{activity.goal}</p>
+            <div className="detail-hero-meta">
+              <span><CalendarDays size={14} /> {activity.range}</span>
+              <span><Users size={14} /> 负责人 {activity.owner}</span>
+              <span><ShieldCheck size={14} /> {detail.guardrail}</span>
+            </div>
+          </div>
+        </div>
+        <div className="detail-progress-box">
+          <div className="detail-progress-top">
+            <small>积分消耗进度</small>
+            <button><FileBarChart size={13} /> 发放明细</button>
+          </div>
+          <strong>{pointsUsageRate}%</strong>
+          <i><em style={{ width: `${pointsUsageRate}%` }} /></i>
+          <span>已发放 {formatNumber(issuedPoints)} / 预计回发 {formatNumber(pointsValue)} 积分</span>
+        </div>
+      </section>
+
+      <section className="activity-detail-metrics">
+        {[
+          { label: '参与人数', value: activity.people, sub: activity.people.startsWith('预计') ? '预计参与客户' : '活动参与客户', icon: Users, tone: 'orange' },
+          { label: '已发放积分 UID 数', value: detail.issuedUid, sub: '已获得积分的 UID', icon: Gift, tone: 'mint' },
+          { label: '近7天活动牵引消耗', value: detail.consumption, sub: `环比 ${detail.lift}`, icon: BarChart3, tone: 'blue' },
+        ].map((metric) => {
+          const Icon = metric.icon
+          return (
+            <article className="detail-metric-card" key={metric.label}>
+              <span className={`summary-icon ${metric.tone}`}><Icon size={18} /></span>
+              <div>
+                <small>{metric.label}</small>
+                <strong>{metric.value}</strong>
+                <em>{metric.sub}</em>
+              </div>
+            </article>
+          )
+        })}
+      </section>
+
+      <section className="detail-content-grid">
+        <article className="panel rule-detail-panel">
+          <div className="panel-head">
+            <div>
+              <span className="section-kicker">RULE CONFIG</span>
+              <h3>规则配置</h3>
+            </div>
+            <button className="secondary-button compact">编辑规则</button>
+          </div>
+          <div className="detail-rule-list">
+            {detail.rules.map((rule, index) => (
+              <section className="detail-rule-card" key={rule.title}>
+                <span>{index + 1}</span>
+                <div>
+                  <strong>{rule.title}</strong>
+                  <p>{rule.desc}</p>
+                  <div>
+                    <em>{rule.metric}</em>
+                    <em>{rule.reward}</em>
+                  </div>
+                </div>
+              </section>
+            ))}
+          </div>
+        </article>
+
+        <article className="panel activity-detail-data-panel">
+          <div className="panel-head">
+            <div>
+              <span className="section-kicker">ACTIVITY DATA</span>
+              <h3>近7天活动数据</h3>
+            </div>
+            <button className="secondary-button compact"><FileBarChart size={14} /> 导出</button>
+          </div>
+          <ActivityDetailChart series={detail.series} />
+        </article>
+      </section>
+    </div>
+  )
+}
+
+function ActivityDetailChart({ series }: { series: ActivityDetailSeriesPoint[] }) {
+  const width = 640
+  const height = 188
+  const metrics = [
+    { key: 'consumption', wowKey: 'consumptionWow', label: '牵引消耗', color: '#6257e6', format: (value: number) => `¥${formatNumber(value)}` },
+    { key: 'materials', wowKey: 'materialsWow', label: '有消耗素材数', color: '#29a6bd', format: (value: number) => `${formatNumber(value)} 条` },
+    { key: 'arpu', wowKey: 'arpuWow', label: '有消耗素材 ARPU', color: '#ef9a55', format: (value: number) => `¥${value.toFixed(1)}` },
+  ] as const
+  const latest = series[series.length - 1]
+  const buildPlot = (key: typeof metrics[number]['key']) => {
+    const values = series.map((item) => item[key])
+    const min = Math.min(...values)
+    const max = Math.max(...values)
+    const range = max - min || 1
+    const coords = values.map((value, index) => ({
+      x: 16 + (index / (series.length - 1)) * (width - 32),
+      y: 26 + (1 - (value - min) / range) * (height - 62),
+    }))
+    return {
+      coords,
+      points: coords.map((point) => `${point.x},${point.y}`).join(' '),
+      areaPath: `M ${coords[0].x},${height - 18} L ${coords.map((point) => `${point.x},${point.y}`).join(' L ')} L ${coords[coords.length - 1].x},${height - 18} Z`,
+    }
+  }
+
+  return (
+    <div className="activity-detail-chart">
+      <div className="detail-chart-legend">
+        {metrics.map((metric) => (
+          <span key={metric.key}>
+            <i style={{ background: metric.color }} />
+            <small>{metric.label}</small>
+            <strong>{metric.format(latest[metric.key])}</strong>
+            <em className={latest[metric.wowKey].startsWith('-') ? 'negative' : ''}>环比 {latest[metric.wowKey]}</em>
+          </span>
+        ))}
+      </div>
+      <svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-label="近7天活动牵引消耗、有消耗素材数、有消耗素材 ARPU 趋势图">
+        <defs>
+          <linearGradient id="detailChartFill" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#766bea" stopOpacity=".22" />
+            <stop offset="100%" stopColor="#766bea" stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <g stroke="#eceef4" strokeWidth="1">
+          {[34, 68, 102, 136, 170].map((y) => <line x1="0" y1={y} x2={width} y2={y} key={y} />)}
+        </g>
+        {metrics.map((metric, metricIndex) => {
+          const plot = buildPlot(metric.key)
+          return (
+            <g key={metric.key}>
+              {metricIndex === 0 && <path d={plot.areaPath} fill="url(#detailChartFill)" />}
+              <polyline points={plot.points} fill="none" stroke={metric.color} strokeWidth={metricIndex === 0 ? 4 : 3} strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+              {plot.coords.map((point, index) => <circle key={`${metric.key}-${series[index].day}`} cx={point.x} cy={point.y} r={metricIndex === 0 ? 4.5 : 3.7} fill="#fff" stroke={metric.color} strokeWidth="2.6" vectorEffect="non-scaling-stroke" />)}
+            </g>
+          )
+        })}
+      </svg>
+      <div className="detail-chart-axis">
+        {series.map((item) => <span key={item.day}>{item.day}</span>)}
+      </div>
+      <div className="detail-daily-grid">
+        {series.map((item) => (
+          <div key={item.day}>
+            <span>{item.day}</span>
+            <p><small>牵引</small><strong>¥{formatNumber(item.consumption)}</strong><em className={item.consumptionWow.startsWith('-') ? 'negative' : ''}>{item.consumptionWow}</em></p>
+            <p><small>素材</small><strong>{formatNumber(item.materials)}</strong><em className={item.materialsWow.startsWith('-') ? 'negative' : ''}>{item.materialsWow}</em></p>
+            <p><small>ARPU</small><strong>¥{item.arpu.toFixed(1)}</strong><em className={item.arpuWow.startsWith('-') ? 'negative' : ''}>{item.arpuWow}</em></p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function getActivityDetail(activity: ActivityItem) {
+  if (activity.type === '排位赛') {
+    return {
+      audience: '美妆行业 A1-A3 客户',
+      entry: '按近7天活动牵引消耗自动排名',
+      rewardMode: '按名次梯度发放',
+      guardrail: '排名奖励池封顶 24 万积分',
+      progressNote: '榜单每小时刷新一次',
+      reached: '榜单内 986 UID',
+      issuedUid: '986',
+      consumption: '¥512,400',
+      lift: '+31.6%',
+      dataScope: '榜单、发放和消耗',
+      rules: [
+        { title: '榜单指标', desc: '统计活动期内客户通过美妆行业模板产生的活动牵引消耗，按 UID 归因排名。', metric: '当前 Top 100 均消耗 ¥5,124', reward: 'Top 1-10 发 5,000 积分' },
+        { title: '入榜门槛', desc: '至少生成 5 条素材，且活动牵引消耗不低于 800 元，低于门槛不参与奖励。', metric: '达门槛 318 UID', reward: 'Top 11-100 发 1,000 积分' },
+      ],
+      series: [
+        { day: '6/17', consumption: 52800, consumptionWow: '+8.1%', materials: 4820, materialsWow: '+6.4%', arpu: 69.2, arpuWow: '+3.2%' },
+        { day: '6/18', consumption: 61400, consumptionWow: '+12.4%', materials: 5360, materialsWow: '+8.8%', arpu: 70.6, arpuWow: '+3.8%' },
+        { day: '6/19', consumption: 68600, consumptionWow: '+15.9%', materials: 5840, materialsWow: '+12.1%', arpu: 71.8, arpuWow: '+4.5%' },
+        { day: '6/20', consumption: 73100, consumptionWow: '+18.8%', materials: 6120, materialsWow: '+15.6%', arpu: 72.4, arpuWow: '+5.1%' },
+        { day: '6/21', consumption: 79400, consumptionWow: '+24.6%', materials: 6480, materialsWow: '+19.3%', arpu: 73.1, arpuWow: '+5.8%' },
+        { day: '6/22', consumption: 82300, consumptionWow: '+28.2%', materials: 6710, materialsWow: '+22.7%', arpu: 73.5, arpuWow: '+6.2%' },
+        { day: '6/23', consumption: 94700, consumptionWow: '+31.6%', materials: 6920, materialsWow: '+27.1%', arpu: 74.0, arpuWow: '+6.8%' },
+      ],
+    }
+  }
+
+  if (activity.type === '定价折扣') {
+    return {
+      audience: activity.status === '已结束' ? '一键同款活跃客户' : '618 节点潜在消耗客户',
+      entry: '活动期使用指定模型或工具',
+      rewardMode: '按折扣价实时扣减',
+      guardrail: '折扣成本每日封顶',
+      progressNote: activity.status === '已结束' ? '已完成复盘数据沉淀' : '待活动开始后采集数据',
+      reached: activity.status === '已结束' ? '2,106 UID' : '预计 1,200 UID',
+      issuedUid: activity.status === '已结束' ? '2,106' : '0',
+      consumption: activity.status === '已结束' ? '¥298,700' : '¥180,000',
+      lift: activity.status === '已结束' ? '+22.4%' : '+18.5%',
+      dataScope: '折扣使用、消耗和素材',
+      rules: [
+        { title: '折扣范围', desc: '指定模型或工具在活动期内按 8 折计费，订单扣减时自动识别活动资格。', metric: '覆盖 4 个 SKU', reward: '8 折实时生效' },
+        { title: '使用上限', desc: '单 UID 活动期最多享受 20 次折扣，超出后恢复标准定价。', metric: '人均使用 6.8 次', reward: '超限自动恢复原价' },
+      ],
+      series: [
+        { day: '6/17', consumption: 24600, consumptionWow: '+4.2%', materials: 1830, materialsWow: '+2.6%', arpu: 72.4, arpuWow: '+1.8%' },
+        { day: '6/18', consumption: 28400, consumptionWow: '+6.7%', materials: 2110, materialsWow: '+4.1%', arpu: 74.2, arpuWow: '+2.4%' },
+        { day: '6/19', consumption: 31800, consumptionWow: '+8.9%', materials: 2380, materialsWow: '+6.3%', arpu: 76.1, arpuWow: '+3.1%' },
+        { day: '6/20', consumption: 39200, consumptionWow: '+13.4%', materials: 2920, materialsWow: '+10.5%', arpu: 78.6, arpuWow: '+4.4%' },
+        { day: '6/21', consumption: 45600, consumptionWow: '+17.2%', materials: 3380, materialsWow: '+14.8%', arpu: 80.7, arpuWow: '+5.6%' },
+        { day: '6/22', consumption: 51200, consumptionWow: '+20.1%', materials: 3890, materialsWow: '+18.6%', arpu: 82.3, arpuWow: '+6.3%' },
+        { day: '6/23', consumption: 57800, consumptionWow: '+22.4%', materials: 4210, materialsWow: '+21.2%', arpu: 83.9, arpuWow: '+7.4%' },
+      ],
+    }
+  }
+
+  return {
+    audience: activity.name.includes('A0') ? 'A0-A1 新客分层' : '新模型潜力客户',
+    entry: '圈选客户 + UID 去重校验',
+    rewardMode: '满足任一规则后按 UID 发放',
+    guardrail: '单 UID 单规则仅发放一次',
+    progressNote: activity.status === '待审批' ? '审批通过后开始执行' : '达标 UID 分批发放中',
+    reached: activity.status === '待审批' ? '预计 3,000 UID' : '已达标 960 UID',
+    issuedUid: activity.status === '待审批' ? '0' : '960',
+    consumption: activity.name.includes('A0') ? '¥450,000' : '¥328,600',
+    lift: activity.name.includes('A0') ? '+19.8%' : '+23.8%',
+    dataScope: '任务达标、发放和消耗',
+    rules: [
+      { title: '规则 1 · 新客首投达标', desc: '生成素材不少于 3 条，且 AIGC 成片投放不少于 1 条。', metric: '已达标 642 UID', reward: '1,000 积分 / 人' },
+      { title: '规则 2 · 新模型深度体验', desc: '使用 Seedance 2.0 不少于 2 次，或近7天活动有消耗素材不少于 5 条。', metric: '已达标 318 UID', reward: '600 积分 / 人' },
+    ],
+    series: [
+      { day: '6/17', consumption: 38200, consumptionWow: '+7.6%', materials: 3180, materialsWow: '+5.1%', arpu: 72.6, arpuWow: '+2.8%' },
+      { day: '6/18', consumption: 42100, consumptionWow: '+10.2%', materials: 3370, materialsWow: '+7.3%', arpu: 74.1, arpuWow: '+3.4%' },
+      { day: '6/19', consumption: 48600, consumptionWow: '+13.7%', materials: 3610, materialsWow: '+10.8%', arpu: 76.4, arpuWow: '+5.1%' },
+      { day: '6/20', consumption: 52400, consumptionWow: '+16.5%', materials: 3820, materialsWow: '+13.2%', arpu: 78.2, arpuWow: '+6.2%' },
+      { day: '6/21', consumption: 58100, consumptionWow: '+19.1%', materials: 3970, materialsWow: '+15.4%', arpu: 80.4, arpuWow: '+7.8%' },
+      { day: '6/22', consumption: 61400, consumptionWow: '+21.6%', materials: 4060, materialsWow: '+16.9%', arpu: 82.7, arpuWow: '+8.6%' },
+      { day: '6/23', consumption: 67800, consumptionWow: '+23.8%', materials: 4186, materialsWow: '+18.4%', arpu: 84.6, arpuWow: '+9.6%' },
+    ],
+  }
 }
 
 function ActivityTypeTag({ type }: { type: ActivityType }) {
@@ -603,13 +965,27 @@ function RulesPage({ notify }: { notify: (message: string) => void }) {
   const [modal, setModal] = useState<'return' | 'expiry' | 'price' | null>(null)
   const [returnRate, setReturnRate] = useState('10')
   const [expiry, setExpiry] = useState('30')
+  const pricingModels = [
+    { name: 'Seedance 2.0 Pro', capability: '视频生成', current: '60', previous: '—', unit: '积分 / 次', effective: '2026-06-20', status: '新上线', logo: 'm1', draft: '58', impact: '预计影响新模型尝鲜客户，日均少消耗 3.1 万积分。' },
+    { name: 'Seedance 1.5 Pro', capability: '视频生成', current: '48', previous: '52', unit: '积分 / 次', effective: '2026-06-01', status: '生效中', logo: 'm2', draft: '46', impact: '预计影响存量视频生成客户，日均少消耗 4.6 万积分。' },
+    { name: 'Seedream 4.0', capability: '图片生成', current: '45', previous: '45', unit: '积分 / 次', effective: '2026-05-12', status: '待变更', logo: 'm3', draft: '38', impact: '该变更将影响全部客户，预计日均少消耗 7.2 万积分。' },
+    { name: '数字人 Pro', capability: '视频工具', current: '80', previous: '80', unit: '积分 / 分钟', effective: '2026-04-18', status: '生效中', logo: 'm4', draft: '76', impact: '预计影响数字人工具客户，日均少消耗 2.8 万积分。' },
+  ]
+  const [selectedPricingModel, setSelectedPricingModel] = useState('Seedream 4.0')
+  const [priceDraft, setPriceDraft] = useState('38')
+  const activePricingModel = pricingModels.find((item) => item.name === selectedPricingModel) ?? pricingModels[2]
+  const openPriceModal = (modelName = 'Seedream 4.0') => {
+    const model = pricingModels.find((item) => item.name === modelName) ?? pricingModels[2]
+    setSelectedPricingModel(model.name)
+    setPriceDraft(model.draft)
+    setModal('price')
+  }
   const saveRule = () => {
     setModal(null)
     notify('规则变更已提交审批，审批通过后按计划生效')
   }
   return (
     <div className="page-enter rules-page">
-      <div className="rule-notice"><ShieldCheck size={18} /><div><strong>规则变更受审批保护</strong><span>所有改动都会先生成变更记录，通过运营负责人审批后再按生效时间发布。</span></div><button>查看审批规范 <ArrowRight size={14} /></button></div>
       <section className="rule-card-grid">
         <article className="rule-card">
           <div className="rule-card-head"><span className="rule-icon violet"><RefreshCcw size={20} /></span><span className="status-chip active">生效中</span></div>
@@ -623,7 +999,7 @@ function RulesPage({ notify }: { notify: (message: string) => void }) {
           <p>产品模型定价</p><div className="rule-value"><strong>24</strong><span>个模型</span></div>
           <small>按模型 / SKU 维护单次生成积分定价</small>
           <div className="rule-meta"><span>3 个价格分组</span><span>更新于 6月18日</span></div>
-          <button onClick={() => setModal('price')}>管理定价 <ArrowRight size={15} /></button>
+          <button onClick={() => openPriceModal()}>管理定价 <ArrowRight size={15} /></button>
         </article>
         <article className="rule-card">
           <div className="rule-card-head"><span className="rule-icon mint"><Clock3 size={20} /></span><span className="status-chip active">生效中</span></div>
@@ -640,12 +1016,7 @@ function RulesPage({ notify }: { notify: (message: string) => void }) {
         </div>
         <div className="data-table pricing-table">
           <div className="data-row data-head"><span>模型 / SKU</span><span>能力类型</span><span>当前定价</span><span>上一版定价</span><span>生效时间</span><span>状态</span><span /></div>
-          {[
-            ['Seedance 2.0 Pro', '视频生成', '60 积分 / 次', '—', '2026-06-20', '新上线'],
-            ['Seedance 1.5 Pro', '视频生成', '48 积分 / 次', '52 积分 / 次', '2026-06-01', '生效中'],
-            ['Seedream 4.0', '图片生成', '45 积分 / 次', '45 积分 / 次', '2026-05-12', '待变更'],
-            ['数字人 Pro', '视频工具', '80 积分 / 分钟', '80 积分 / 分钟', '2026-04-18', '生效中'],
-          ].map((row, index) => <div className="data-row" key={row[0]}><span className="model-cell"><i className={`model-logo m${index + 1}`}><Sparkles size={15} /></i><strong>{row[0]}</strong></span><span className="muted-cell">{row[1]}</span><span className="table-number">{row[2]}</span><span className="muted-cell">{row[3]}</span><span className="muted-cell">{row[4]}</span><span><span className={`simple-status ${row[5] === '待变更' ? 'pending' : row[5] === '新上线' ? 'new' : ''}`}>{row[5]}</span></span><span><button className="ghost-icon" onClick={() => setModal('price')}><MoreHorizontal size={17} /></button></span></div>)}
+          {pricingModels.map((model) => <div className="data-row" key={model.name}><span className="model-cell"><i className={`model-logo ${model.logo}`}><Sparkles size={15} /></i><strong>{model.name}</strong></span><span className="muted-cell">{model.capability}</span><span className="table-number">{model.current} {model.unit}</span><span className="muted-cell">{model.previous === '—' ? '—' : `${model.previous} ${model.unit}`}</span><span className="muted-cell">{model.effective}</span><span><span className={`simple-status ${model.status === '待变更' ? 'pending' : model.status === '新上线' ? 'new' : ''}`}>{model.status}</span></span><span><button className="ghost-icon" onClick={() => openPriceModal(model.name)}><MoreHorizontal size={17} /></button></span></div>)}
         </div>
       </section>
       {modal && (
@@ -653,8 +1024,34 @@ function RulesPage({ notify }: { notify: (message: string) => void }) {
           <div className="rule-modal">
             <div className="modal-header"><div><span className="section-kicker">CHANGE REQUEST</span><h2>{modal === 'return' ? '调整消耗返还比例' : modal === 'expiry' ? '调整积分有效期' : '调整模型定价'}</h2></div><button className="icon-button" onClick={() => setModal(null)}><X size={18} /></button></div>
             <div className="rule-modal-body">
-              <div className="form-group"><label>{modal === 'return' ? '新返还比例' : modal === 'expiry' ? '新有效期' : 'Seedream 4.0 新定价'}</label><div className="suffix-input"><input type="number" value={modal === 'return' ? returnRate : modal === 'expiry' ? expiry : '38'} onChange={(e) => modal === 'return' ? setReturnRate(e.target.value) : modal === 'expiry' ? setExpiry(e.target.value) : undefined} /><span>{modal === 'return' ? '%' : modal === 'expiry' ? '天' : '积分 / 次'}</span></div></div>
-              <div className="impact-preview"><AlertTriangle size={18} /><div><strong>影响预估</strong><p>{modal === 'price' ? '该变更将影响全部客户，预计日均少消耗 7.2 万积分。' : '该规则为全局机制，变更后将影响所有新到账积分。'}</p></div></div>
+              {modal === 'price' ? (
+                <>
+                  <div className="form-group">
+                    <label>选择模型 <em>*</em></label>
+                    <div className="pricing-model-selector">
+                      {pricingModels.map((model) => (
+                        <button className={activePricingModel.name === model.name ? 'active' : ''} key={model.name} onClick={() => { setSelectedPricingModel(model.name); setPriceDraft(model.draft) }}>
+                          <i className={`model-logo ${model.logo}`}><Sparkles size={14} /></i>
+                          <span>
+                            <strong>{model.name}</strong>
+                            <small>{model.capability} · 当前 {model.current} {model.unit}</small>
+                          </span>
+                          <em>{activePricingModel.name === model.name && <Check size={13} />}</em>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="selected-model-summary">
+                    <span><small>当前定价</small><strong>{activePricingModel.current} {activePricingModel.unit}</strong></span>
+                    <span><small>上一版定价</small><strong>{activePricingModel.previous === '—' ? '暂无' : `${activePricingModel.previous} ${activePricingModel.unit}`}</strong></span>
+                    <span><small>当前状态</small><strong>{activePricingModel.status}</strong></span>
+                  </div>
+                  <div className="form-group"><label>{activePricingModel.name} 新定价 <em>*</em></label><div className="suffix-input"><input type="number" value={priceDraft} onChange={(e) => setPriceDraft(e.target.value)} /><span>{activePricingModel.unit}</span></div></div>
+                </>
+              ) : (
+                <div className="form-group"><label>{modal === 'return' ? '新返还比例' : '新有效期'}</label><div className="suffix-input"><input type="number" value={modal === 'return' ? returnRate : expiry} onChange={(e) => modal === 'return' ? setReturnRate(e.target.value) : setExpiry(e.target.value)} /><span>{modal === 'return' ? '%' : '天'}</span></div></div>
+              )}
+              <div className="impact-preview"><AlertTriangle size={18} /><div><strong>影响预估</strong><p>{modal === 'price' ? activePricingModel.impact : '该规则为全局机制，变更后将影响所有新到账积分。'}</p></div></div>
               <div className="form-group"><label>生效时间</label><input className="plain-input" type="datetime-local" defaultValue="2026-06-26T00:00" /></div>
               <div className="form-group"><label>变更原因</label><textarea placeholder="请说明变更背景和预期效果" defaultValue="配合新一阶段积分运营策略调整" /></div>
             </div>
@@ -761,8 +1158,28 @@ function ActivityWizard({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
   const [type, setType] = useState<ActivityType>('任务类')
   const [name, setName] = useState('A0 新客首投成长计划')
   const [budget, setBudget] = useState('200000')
-  const [logic, setLogic] = useState<'且' | '或'>('且')
+  const [audienceMode, setAudienceMode] = useState<'圈选客户' | '上传UID名单'>('圈选客户')
   const [segments, setSegments] = useState(['A0', 'A1'])
+  const configuredRules = [
+    {
+      name: '规则 1 · 新客首投达标',
+      logic: '且',
+      reward: '1,000 积分 / 人',
+      conditions: [
+        ['生成素材', '不少于', '3', '条'],
+        ['AIGC 成片投放', '不少于', '1', '条'],
+      ],
+    },
+    {
+      name: '规则 2 · 新模型深度体验',
+      logic: '或',
+      reward: '600 积分 / 人',
+      conditions: [
+        ['使用 Seedance 2.0', '不少于', '2', '次'],
+        ['近7天活动有消耗素材', '不少于', '5', '条'],
+      ],
+    },
+  ]
   const projected = useMemo(() => Math.min(Number(budget || 0), 300000), [budget])
   const toggleSegment = (value: string) => setSegments((items) => items.includes(value) ? items.filter((x) => x !== value) : [...items, value])
   const submit = () => onSubmit({
@@ -780,8 +1197,53 @@ function ActivityWizard({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
             <button className={type === '定价折扣' ? 'selected' : ''} onClick={() => setType('定价折扣')}><span className="type-art discount"><Zap size={24}/></span><div><strong>定价折扣</strong><p>限时折扣或多倍积分，用于新模型推广与节点促销。</p><small>模型折扣 · 积分多倍</small></div><i>{type === '定价折扣' && <Check size={14}/>}</i></button>
           </div></div>}
           {step === 2 && <div className="wizard-section"><div className="section-intro"><h3>填写基本信息</h3><p>这些信息会用于活动管理、审批和自动生成通知。</p></div><div className="form-grid"><div className="form-group full"><label>活动名称 <em>*</em></label><input className="plain-input" value={name} onChange={(e)=>setName(e.target.value)} /></div><div className="form-group"><label>开始时间 <em>*</em></label><input className="plain-input" type="datetime-local" defaultValue="2026-07-01T00:00" /></div><div className="form-group"><label>结束时间 <em>*</em></label><input className="plain-input" type="datetime-local" defaultValue="2026-07-31T23:59" /></div><div className="form-group"><label>积分预算 <em>*</em></label><div className="suffix-input"><input type="number" value={budget} onChange={(e)=>setBudget(e.target.value)}/><span>积分</span></div><small className="field-hint">单活动超过 300,000 积分将标记为高风险</small></div><div className="form-group"><label>活动目标</label><select defaultValue="新客培养"><option>新客培养</option><option>客户消耗拉升</option><option>新模型推广</option><option>沉默客户唤醒</option></select></div><div className="form-group full"><label>活动说明</label><textarea defaultValue="引导 A0 新客户在 3 天内完成首条素材生成与投放，完成后自动发放成长积分。" /></div></div></div>}
-          {step === 3 && <div className="wizard-section"><div className="section-intro"><h3>圈定人群，配置达标规则</h3><p>系统将基于 UID 身份与行为数据实时识别达标客户。</p></div><div className="form-group"><label>客户分层</label><div className="choice-pills">{['A0','A1','A2','A3','A4+'].map(x=><button className={segments.includes(x)?'active':''} key={x} onClick={()=>toggleSegment(x)}>{x}{segments.includes(x)&&<Check size={13}/>}</button>)}</div></div><div className="rule-builder"><div className="builder-head"><span>达标条件</span><div><small>条件关系</small><button className={logic==='且'?'active':''} onClick={()=>setLogic('且')}>且 AND</button><button className={logic==='或'?'active':''} onClick={()=>setLogic('或')}>或 OR</button></div></div><div className="condition-row"><span>1</span><select defaultValue="生成素材"><option>生成素材</option><option>使用指定模型</option><option>AIGC 成片投放</option></select><select defaultValue="不少于"><option>不少于</option><option>等于</option></select><input defaultValue="3"/><select defaultValue="条"><option>条</option><option>次</option></select><button><X size={15}/></button></div><div className="logic-divider"><span>{logic}</span></div><div className="condition-row"><span>2</span><select defaultValue="AIGC 成片投放"><option>AIGC 成片投放</option><option>使用指定模型</option><option>生成素材</option></select><select defaultValue="不少于"><option>不少于</option><option>等于</option></select><input defaultValue="1"/><select defaultValue="条"><option>条</option><option>次</option></select><button><X size={15}/></button></div><button className="add-condition"><Plus size={15}/> 添加条件</button></div><div className="reward-box"><div><span className="rule-icon mint"><Gift size={18}/></span><div><strong>达标奖励</strong><small>每个 UID 每个活动仅发放一次</small></div></div><div className="suffix-input"><input defaultValue="1000"/><span>积分 / 人</span></div></div></div>}
-          {step === 4 && <div className="wizard-section preview-section"><div className="section-intro"><h3>确认无误，提交审批</h3><p>系统已完成配置检查，并为你生成发布后的执行链路。</p></div><div className="preview-hero"><div><ActivityTypeTag type={type}/><h3>{name}</h3><p>2026年7月1日 00:00 — 7月31日 23:59</p><div>{segments.map(x=><span key={x}>{x}</span>)}</div></div><span className="preview-budget"><small>积分预算</small><strong>{formatNumber(Number(budget || 0))}</strong><em>积分</em></span></div><div className="flow-preview">{[['运营配置',CheckCircle2],['负责人审批',ShieldCheck],['发布与通知',Bell],['识别并发放',Zap],['自动复盘',FileBarChart]].map(([label,Icon],i)=><div key={label as string}><span><Icon size={17}/></span><small>{label as string}</small>{i<4&&<i/>}</div>)}</div><div className="risk-check-card"><div className="risk-check-head"><ShieldCheck size={18}/><strong>发布前检查</strong><span>4 项通过 · {Number(budget)>300000?'1 项需关注':'无风险项'}</span></div><ul><li><CheckCircle2 size={15}/> 参与范围可识别：{segments.join('、')} 客户</li><li><CheckCircle2 size={15}/> 奖励发放已设置单 UID 上限</li><li><CheckCircle2 size={15}/> 对客通知将在发布后自动生成</li><li className={Number(budget)>300000?'warn':''}>{Number(budget)>300000?<AlertTriangle size={15}/>:<CheckCircle2 size={15}/>} 预计锁定 {formatNumber(projected)} 积分{Number(budget)>300000?'，超过默认审批阈值':'，在可用积分池范围内'}</li></ul></div></div>}
+          {step === 3 && <div className="wizard-section">
+            <div className="section-intro"><h3>圈定人群，配置达标规则</h3><p>支持按客户分层圈选，也可以上传 UID 名单 Excel 精准指定客户。</p></div>
+            <div className="audience-card">
+              <div className="audience-card-head">
+                <div><strong>目标人群</strong><small>选择一种或多种方式圈定本次活动参与客户</small></div>
+                <div className="audience-mode-tabs">
+                  {(['圈选客户', '上传UID名单'] as const).map((mode) => <button className={audienceMode === mode ? 'active' : ''} key={mode} onClick={() => setAudienceMode(mode)}>{mode}</button>)}
+                </div>
+              </div>
+              <div className="audience-method-grid">
+                <div>
+                  <label>客户分层圈选</label>
+                  <div className="choice-pills">{['A0','A1','A2','A3','A4+'].map(x=><button className={segments.includes(x)?'active':''} key={x} onClick={()=>toggleSegment(x)}>{x}{segments.includes(x)&&<Check size={13}/>}</button>)}</div>
+                </div>
+                <button className={`upload-dropzone ${audienceMode === '上传UID名单' ? 'active' : ''}`} onClick={() => setAudienceMode('上传UID名单')}>
+                  <Upload size={18} />
+                  <span><strong>上传 UID 名单</strong><small>支持 .xlsx / .xls，系统将按 UID 去重校验</small></span>
+                </button>
+              </div>
+            </div>
+            <div className="multi-rule-builder">
+              <div className="builder-head"><span>达标规则</span><button className="secondary-button compact"><Plus size={14} /> 添加规则</button></div>
+              {configuredRules.map((rule, ruleIndex) => (
+                <section className="rule-config-card" key={rule.name}>
+                  <div className="rule-config-head">
+                    <span>{rule.name}</span>
+                    <em>条件关系：{rule.logic === '且' ? '且 AND' : '或 OR'}</em>
+                  </div>
+                  {rule.conditions.map((condition, conditionIndex) => (
+                    <div className="condition-row" key={`${rule.name}-${condition[0]}`}>
+                      <span>{conditionIndex + 1}</span>
+                      <select defaultValue={condition[0]}><option>{condition[0]}</option><option>生成素材</option><option>使用指定模型</option><option>AIGC 成片投放</option><option>近7天活动有消耗素材</option></select>
+                      <select defaultValue={condition[1]}><option>不少于</option><option>等于</option></select>
+                      <input defaultValue={condition[2]}/>
+                      <select defaultValue={condition[3]}><option>条</option><option>次</option></select>
+                      <button><X size={15}/></button>
+                    </div>
+                  ))}
+                  <div className="rule-reward-row">
+                    <div><span className="rule-icon mint"><Gift size={17}/></span><div><strong>对应发放积分</strong><small>满足本规则后按 UID 发放一次</small></div></div>
+                    <div className="suffix-input"><input defaultValue={ruleIndex === 0 ? '1000' : '600'} /><span>积分 / 人</span></div>
+                  </div>
+                </section>
+              ))}
+            </div>
+          </div>}
+          {step === 4 && <div className="wizard-section preview-section"><div className="section-intro"><h3>确认无误，提交审批</h3><p>请核对活动人群、达标规则和积分发放配置，确认后提交审批。</p></div><div className="preview-hero"><div><ActivityTypeTag type={type}/><h3>{name}</h3><p>2026年7月1日 00:00 — 7月31日 23:59</p><div>{segments.map(x=><span key={x}>{x}</span>)}</div></div><span className="preview-budget"><small>积分预算</small><strong>{formatNumber(Number(budget || 0))}</strong><em>积分</em></span></div><div className="flow-preview">{[['运营配置',CheckCircle2],['负责人审批',ShieldCheck],['发布与通知',Bell],['识别并发放',Zap],['自动复盘',FileBarChart]].map(([label,Icon],i)=><div key={label as string}><span><Icon size={17}/></span><small>{label as string}</small>{i<4&&<i/>}</div>)}</div><div className="config-check-card"><div className="config-check-head"><ShieldCheck size={18}/><strong>活动配置核对</strong><span>{configuredRules.length} 条规则 · 预计锁定 {formatNumber(projected)} 积分</span></div><div className="config-check-summary"><span><CheckCircle2 size={15}/> 人群方式：{audienceMode}</span><span><CheckCircle2 size={15}/> 圈选层级：{segments.join('、')}</span><span><CheckCircle2 size={15}/> UID 发放上限：每条规则每 UID 一次</span><span className={Number(budget)>300000?'warn':''}>{Number(budget)>300000?<AlertTriangle size={15}/>:<CheckCircle2 size={15}/>} 积分预算：{formatNumber(Number(budget || 0))}</span></div><div className="rule-review-list">{configuredRules.map((rule) => <section key={rule.name}><div><strong>{rule.name}</strong><em>{rule.logic === '且' ? '满足全部条件' : '满足任一条件'} · 发放 {rule.reward}</em></div><ul>{rule.conditions.map((condition) => <li key={`${rule.name}-${condition[0]}`}>{condition[0]} {condition[1]} {condition[2]} {condition[3]}</li>)}</ul></section>)}</div></div></div>}
         </div>
         <footer className="wizard-footer"><button className="secondary-button" onClick={step === 1 ? onClose : () => setStep(step - 1)}>{step === 1 ? '取消' : <><ChevronLeft size={16}/> 上一步</>}</button><div><span>草稿自动保存</span>{step < 4 ? <button className="primary-button" onClick={() => setStep(step + 1)}>下一步 <ChevronRight size={16}/></button> : <button className="primary-button" onClick={submit} data-testid="submit-activity"><ShieldCheck size={16}/> 提交审批</button>}</div></footer>
       </div>
