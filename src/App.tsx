@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { type Dispatch, type SetStateAction, useEffect, useMemo, useState } from 'react'
 import {
   Activity,
   AlertTriangle,
@@ -37,9 +37,24 @@ import {
   Zap,
 } from 'lucide-react'
 
-type PageKey = 'dashboard' | 'activities' | 'rules' | 'approvals' | 'reports' | 'risk'
+type PageKey = 'dashboard' | 'activities' | 'rules' | 'approvals' | 'risk' | 'design-lab'
 type ActivityStatus = '进行中' | '待开始' | '待审批' | '已结束'
 type ActivityType = '任务类' | '排位赛' | '定价折扣'
+type AccentKey = 'peach' | 'sage' | 'rose' | 'blue' | 'lavender'
+
+type DesignSettings = {
+  panelWhite: number
+  gridSize: number
+  gridOpacity: number
+  borderWidth: number
+  shadowOffset: number
+  radius: number
+  saturation: number
+  density: number
+  accent: AccentKey
+}
+
+type NumberDesignSetting = Exclude<keyof DesignSettings, 'accent'>
 
 type ActivityItem = {
   id: number
@@ -177,31 +192,115 @@ const initialApprovals: Approval[] = [
   },
 ]
 
+const defaultDesignSettings: DesignSettings = {
+  panelWhite: 100,
+  gridSize: 16,
+  gridOpacity: 4,
+  borderWidth: 2,
+  shadowOffset: 5,
+  radius: 0,
+  saturation: 76,
+  density: 100,
+  accent: 'peach',
+}
+
+const accentPalettes: Record<AccentKey, { label: string; main: string; soft: string; muted: string; text: string }> = {
+  peach: { label: '杏桃', main: '#dec3aa', soft: '#f3e6da', muted: '#cdb9a6', text: '#684d38' },
+  sage: { label: '鼠尾草', main: '#dbe8d6', soft: '#eef6eb', muted: '#b8c9b1', text: '#3e665d' },
+  rose: { label: '灰玫瑰', main: '#eadde1', soft: '#f7eef1', muted: '#d7c0c8', text: '#76515e' },
+  blue: { label: '雾蓝', main: '#dfecef', soft: '#f0f7f8', muted: '#bfd1d7', text: '#45626b' },
+  lavender: { label: '灰紫', main: '#dfdcef', soft: '#f1f0fa', muted: '#c4bfde', text: '#5a567c' },
+}
+
+const designPresets: Array<DesignSettings & { id: string; name: string }> = [
+  { ...defaultDesignSettings, id: 'white-grid', name: '白色方格' },
+  { panelWhite: 99, gridSize: 18, gridOpacity: 3, borderWidth: 1, shadowOffset: 4, radius: 2, saturation: 62, density: 96, accent: 'sage', id: 'morandi-soft', name: '莫兰迪软白' },
+  { panelWhite: 100, gridSize: 12, gridOpacity: 7, borderWidth: 2, shadowOffset: 7, radius: 0, saturation: 86, density: 92, accent: 'lavender', id: 'pixel-game', name: '像素游戏机' },
+  { panelWhite: 100, gridSize: 22, gridOpacity: 2, borderWidth: 1, shadowOffset: 2, radius: 4, saturation: 54, density: 108, accent: 'blue', id: 'clean-desk', name: '清爽工作台' },
+]
+
 const navItems: { key: PageKey; label: string; icon: typeof LayoutDashboard; badge?: string }[] = [
   { key: 'dashboard', label: '运营总览', icon: LayoutDashboard },
   { key: 'activities', label: '活动管理', icon: Sparkles },
   { key: 'rules', label: '积分规则', icon: CircleDollarSign },
   { key: 'approvals', label: '审批中心', icon: ListChecks, badge: '3' },
-  { key: 'reports', label: '复盘报告', icon: FileBarChart },
 ]
 
 const pageMeta: Record<PageKey, { eyebrow: string; title: string; desc: string }> = {
-  dashboard: { eyebrow: 'OPERATION OVERVIEW', title: '今天，也让积分花得更值', desc: '所有活动、积分池与客户增长信号都在这里。' },
-  activities: { eyebrow: 'ACTIVITY STUDIO', title: '活动管理', desc: '从配置、审批到执行与复盘，管理每一场积分活动。' },
+  dashboard: { eyebrow: 'POINTS BOOK', title: '积分活动小账本', desc: '用账本视角看活动、预算、审批和客户分层表现。' },
+  activities: { eyebrow: 'ACTIVITY STUDIO', title: '活动管理', desc: '从配置、审批到执行与归档，管理每一场积分活动。' },
   rules: { eyebrow: 'POINTS ENGINE', title: '积分规则', desc: '管理返还比例、模型定价和积分有效期等底层机制。' },
   approvals: { eyebrow: 'APPROVAL CENTER', title: '审批中心', desc: '在规则或积分真正生效前，拦住风险，也放行好主意。' },
-  reports: { eyebrow: 'INSIGHT & REVIEW', title: '复盘报告', desc: '连接积分、使用和投放数据，回答活动究竟带来了什么。' },
   risk: { eyebrow: 'GUARDRAILS', title: '风控与权限', desc: '用权限、阈值与回滚记录守住运营安全边界。' },
+  'design-lab': { eyebrow: 'DESIGN LAB', title: 'UI 调参台', desc: '直接调产品视觉参数，满意后再固化成正式样式。' },
+}
+
+const pageKeys: PageKey[] = ['dashboard', 'activities', 'rules', 'approvals', 'risk', 'design-lab']
+
+const getInitialDesignSettings = (): DesignSettings => {
+  if (typeof window === 'undefined') return defaultDesignSettings
+  try {
+    const cached = window.localStorage.getItem('pointflow-design-settings')
+    if (!cached) return defaultDesignSettings
+    const parsed = JSON.parse(cached) as Partial<DesignSettings>
+    return {
+      ...defaultDesignSettings,
+      ...parsed,
+      accent: parsed.accent && parsed.accent in accentPalettes ? parsed.accent : defaultDesignSettings.accent,
+    }
+  } catch {
+    return defaultDesignSettings
+  }
+}
+
+const getInitialPage = (): PageKey => {
+  if (typeof window === 'undefined') return 'dashboard'
+  const key = window.location.hash.replace('#', '') as PageKey
+  return pageKeys.includes(key) ? key : 'dashboard'
 }
 
 const formatNumber = (value: number) => new Intl.NumberFormat('zh-CN').format(value)
 
 function App() {
-  const [page, setPage] = useState<PageKey>('dashboard')
+  const [page, setPageState] = useState<PageKey>(getInitialPage)
   const [activities, setActivities] = useState<ActivityItem[]>(initialActivities)
   const [approvals, setApprovals] = useState<Approval[]>(initialApprovals)
+  const [designSettings, setDesignSettings] = useState<DesignSettings>(getInitialDesignSettings)
   const [showWizard, setShowWizard] = useState(false)
   const [toast, setToast] = useState('')
+
+  useEffect(() => {
+    const syncPageFromHash = () => setPageState(getInitialPage())
+    window.addEventListener('hashchange', syncPageFromHash)
+    return () => window.removeEventListener('hashchange', syncPageFromHash)
+  }, [])
+
+  useEffect(() => {
+    const root = document.documentElement
+    const palette = accentPalettes[designSettings.accent]
+    const panelLightness = Math.max(94, Math.min(100, designSettings.panelWhite))
+    root.style.setProperty('--lab-page', `hsl(48 24% ${panelLightness}%)`)
+    root.style.setProperty('--lab-panel', `hsl(48 18% ${panelLightness}%)`)
+    root.style.setProperty('--lab-panel-alt', `hsl(48 16% ${Math.max(92, panelLightness - 1.8)}%)`)
+    root.style.setProperty('--lab-grid-size', `${designSettings.gridSize}px`)
+    root.style.setProperty('--lab-grid-color', `rgba(57, 52, 47, ${designSettings.gridOpacity / 100})`)
+    root.style.setProperty('--lab-border-width', `${designSettings.borderWidth}px`)
+    root.style.setProperty('--lab-radius', `${designSettings.radius}px`)
+    root.style.setProperty('--lab-shadow-offset', `${designSettings.shadowOffset}px`)
+    root.style.setProperty('--lab-shadow-color', `color-mix(in srgb, ${palette.muted} 52%, #dedbd4)`)
+    root.style.setProperty('--lab-density', `${designSettings.density / 100}`)
+    root.style.setProperty('--lab-saturation', `${designSettings.saturation}%`)
+    root.style.setProperty('--lab-accent', palette.main)
+    root.style.setProperty('--lab-accent-soft', palette.soft)
+    root.style.setProperty('--lab-accent-muted', palette.muted)
+    root.style.setProperty('--lab-accent-text', palette.text)
+    window.localStorage.setItem('pointflow-design-settings', JSON.stringify(designSettings))
+  }, [designSettings])
+
+  const setPage = (nextPage: PageKey) => {
+    setPageState(nextPage)
+    window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${nextPage}`)
+  }
 
   const notify = (message: string) => {
     setToast(message)
@@ -243,8 +342,9 @@ function App() {
 
   return (
     <div className="app-shell">
+      <a className="skip-link" href="#main-content">跳过导航</a>
       <Sidebar page={page} setPage={setPage} pendingCount={pendingCount} />
-      <main className="main-shell">
+      <main className="main-shell" id="main-content" tabIndex={-1}>
         <Topbar page={page} onCreate={() => setShowWizard(true)} />
         <div className="content-shell">
           {page === 'dashboard' && (
@@ -255,13 +355,20 @@ function App() {
           {page === 'approvals' && (
             <ApprovalsPage approvals={approvals} onDecision={handleApproval} />
           )}
-          {page === 'reports' && <ReportsPage />}
           {page === 'risk' && <RiskPage notify={notify} />}
+          {page === 'design-lab' && (
+            <DesignLab
+              settings={designSettings}
+              setSettings={setDesignSettings}
+              setPage={setPage}
+              notify={notify}
+            />
+          )}
         </div>
       </main>
       {showWizard && <ActivityWizard onClose={() => setShowWizard(false)} onSubmit={createActivity} />}
       {toast && (
-        <div className="toast" role="status">
+        <div className="toast" role="status" aria-live="polite">
           <CheckCircle2 size={18} />
           {toast}
         </div>
@@ -312,6 +419,7 @@ function Sidebar({
               className={page === item.key ? 'active' : ''}
               onClick={() => setPage(item.key)}
               data-testid={`nav-${item.key}`}
+              aria-current={page === item.key ? 'page' : undefined}
             >
               <Icon size={18} strokeWidth={1.8} />
               <span>{item.label}</span>
@@ -320,9 +428,13 @@ function Sidebar({
           )
         })}
         <p className="nav-caption nav-caption-spaced">系统</p>
-        <button className={page === 'risk' ? 'active' : ''} onClick={() => setPage('risk')}>
+        <button className={page === 'risk' ? 'active' : ''} onClick={() => setPage('risk')} aria-current={page === 'risk' ? 'page' : undefined}>
           <ShieldCheck size={18} strokeWidth={1.8} />
           <span>风控与权限</span>
+        </button>
+        <button className={page === 'design-lab' ? 'active' : ''} onClick={() => setPage('design-lab')} aria-current={page === 'design-lab' ? 'page' : undefined}>
+          <Settings2 size={18} strokeWidth={1.8} />
+          <span>UI 调参台</span>
         </button>
       </nav>
 
@@ -335,7 +447,7 @@ function Sidebar({
         <small>剩余 63.8 万 / 200 万</small>
       </div>
 
-      <button className="user-card">
+      <button className="user-card" aria-label="打开当前用户菜单">
         <span className="user-avatar">YC</span>
         <span>
           <strong>杨翘楚</strong>
@@ -349,6 +461,7 @@ function Sidebar({
 
 function Topbar({ page, onCreate }: { page: PageKey; onCreate: () => void }) {
   const meta = pageMeta[page]
+  const showActions = !['dashboard', 'activities', 'rules', 'design-lab'].includes(page)
   return (
     <header className="topbar">
       <div className="page-heading">
@@ -358,7 +471,7 @@ function Topbar({ page, onCreate }: { page: PageKey; onCreate: () => void }) {
           <p>{meta.desc}</p>
         </div>
       </div>
-      {page !== 'dashboard' && page !== 'activities' && page !== 'rules' && (
+      {showActions && (
         <div className="topbar-actions">
           <label className="global-search">
             <Search size={16} />
@@ -367,7 +480,7 @@ function Topbar({ page, onCreate }: { page: PageKey; onCreate: () => void }) {
           </label>
           <button className="icon-button notification-button" aria-label="通知">
             <Bell size={19} />
-            <span />
+            <span aria-hidden="true" />
           </button>
           <button className="primary-button" onClick={onCreate} data-testid="create-activity">
             <Plus size={17} />
@@ -379,6 +492,238 @@ function Topbar({ page, onCreate }: { page: PageKey; onCreate: () => void }) {
   )
 }
 
+function DesignLab({
+  settings,
+  setSettings,
+  setPage,
+  notify,
+}: {
+  settings: DesignSettings
+  setSettings: Dispatch<SetStateAction<DesignSettings>>
+  setPage: (page: PageKey) => void
+  notify: (message: string) => void
+}) {
+  const cssSnapshot = useMemo(() => {
+    const palette = accentPalettes[settings.accent]
+    return [
+      `panelWhite: ${settings.panelWhite}`,
+      `gridSize: ${settings.gridSize}px`,
+      `gridOpacity: ${settings.gridOpacity}%`,
+      `borderWidth: ${settings.borderWidth}px`,
+      `shadowOffset: ${settings.shadowOffset}px`,
+      `radius: ${settings.radius}px`,
+      `saturation: ${settings.saturation}%`,
+      `density: ${settings.density}%`,
+      `accent: ${palette.label}`,
+    ].join('\n')
+  }, [settings])
+
+  const updateNumber = (key: NumberDesignSetting, value: number) => {
+    setSettings((current) => ({ ...current, [key]: value }))
+  }
+
+  const isPresetActive = (preset: DesignSettings) =>
+    preset.panelWhite === settings.panelWhite &&
+    preset.gridSize === settings.gridSize &&
+    preset.gridOpacity === settings.gridOpacity &&
+    preset.borderWidth === settings.borderWidth &&
+    preset.shadowOffset === settings.shadowOffset &&
+    preset.radius === settings.radius &&
+    preset.saturation === settings.saturation &&
+    preset.density === settings.density &&
+    preset.accent === settings.accent
+
+  const applyPreset = (preset: DesignSettings) => {
+    setSettings({
+      panelWhite: preset.panelWhite,
+      gridSize: preset.gridSize,
+      gridOpacity: preset.gridOpacity,
+      borderWidth: preset.borderWidth,
+      shadowOffset: preset.shadowOffset,
+      radius: preset.radius,
+      saturation: preset.saturation,
+      density: preset.density,
+      accent: preset.accent,
+    })
+  }
+
+  const copySettings = async () => {
+    try {
+      await navigator.clipboard.writeText(cssSnapshot)
+      notify('当前 UI 参数已复制')
+    } catch {
+      notify('浏览器未开放复制权限，参数已显示在右下角')
+    }
+  }
+
+  return (
+    <div className="design-lab-page page-enter">
+      <aside className="design-lab-controls" aria-label="UI 调参控制台">
+        <div className="design-lab-heading">
+          <span className="section-kicker">TUNE PANEL</span>
+          <strong>视觉参数</strong>
+        </div>
+
+        <div className="preset-grid" aria-label="风格预设">
+          {designPresets.map((preset) => (
+            <button
+              key={preset.id}
+              className={isPresetActive(preset) ? 'active' : ''}
+              onClick={() => applyPreset(preset)}
+            >
+              <span>{preset.name}</span>
+              <i aria-hidden="true" />
+            </button>
+          ))}
+        </div>
+
+        <div className="design-control-stack">
+          <DesignSlider label="背景白度" value={settings.panelWhite} min={94} max={100} suffix="%" onChange={(value) => updateNumber('panelWhite', value)} />
+          <DesignSlider label="方格尺寸" value={settings.gridSize} min={10} max={28} suffix="px" onChange={(value) => updateNumber('gridSize', value)} />
+          <DesignSlider label="方格浓度" value={settings.gridOpacity} min={1} max={10} suffix="%" onChange={(value) => updateNumber('gridOpacity', value)} />
+          <DesignSlider label="边框粗细" value={settings.borderWidth} min={1} max={4} suffix="px" onChange={(value) => updateNumber('borderWidth', value)} />
+          <DesignSlider label="投影距离" value={settings.shadowOffset} min={0} max={10} suffix="px" onChange={(value) => updateNumber('shadowOffset', value)} />
+          <DesignSlider label="圆角" value={settings.radius} min={0} max={10} suffix="px" onChange={(value) => updateNumber('radius', value)} />
+          <DesignSlider label="色彩饱和" value={settings.saturation} min={40} max={115} suffix="%" onChange={(value) => updateNumber('saturation', value)} />
+          <DesignSlider label="信息密度" value={settings.density} min={86} max={116} suffix="%" onChange={(value) => updateNumber('density', value)} />
+        </div>
+
+        <div className="accent-picker" aria-label="点缀色">
+          {Object.entries(accentPalettes).map(([key, palette]) => (
+            <button
+              key={key}
+              className={settings.accent === key ? 'active' : ''}
+              onClick={() => setSettings((current) => ({ ...current, accent: key as AccentKey }))}
+            >
+              <i style={{ background: palette.main }} aria-hidden="true" />
+              {palette.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="design-lab-actions">
+          <button className="secondary-button" onClick={() => setSettings(defaultDesignSettings)}>
+            <RefreshCcw size={15} />
+            重置
+          </button>
+          <button className="secondary-button" onClick={copySettings}>
+            <Upload size={15} />
+            复制参数
+          </button>
+        </div>
+      </aside>
+
+      <section className="design-lab-stage" aria-label="组件样式展板">
+        <div className="design-stage-toolbar">
+          <div>
+            <span className="section-kicker">STYLE BOARD</span>
+            <h2>组件样式展板</h2>
+          </div>
+          <div className="design-stage-actions">
+            <button className="text-button" onClick={() => setPage('dashboard')}>看总览页 <ArrowRight size={14} /></button>
+            <button className="text-button" onClick={() => setPage('approvals')}>看审批页 <ArrowRight size={14} /></button>
+          </div>
+        </div>
+
+        <div className="design-preview-shell">
+          <div className="design-preview-hero">
+            <div>
+              <span className="section-kicker">POINTS BOOK</span>
+              <h3>今日积分账本</h3>
+              <p>预算、审批和排期被收进一张白色方格面板。</p>
+              <div className="brief-sticker-row">
+                <span>预算安全区</span>
+                <span>1 个待审批</span>
+                <span>2 场进行中</span>
+              </div>
+            </div>
+            <div className="brief-meter design-meter-sample">
+              <span className="ledger-ticket">积分饼干罐</span>
+              <div className="budget-dial"><strong>68%</strong><span>预算锁定</span></div>
+            </div>
+          </div>
+
+          <div className="design-preview-metrics">
+            <MetricCard icon={Sparkles} label="在线活动" value="6" unit="场" change="+2" tone="violet" />
+            <MetricCard icon={Gift} label="近7天累计发放积分" value="1.284" unit="M" change="+18.2%" tone="mint" />
+            <MetricCard icon={Users} label="参与客户数" value="4,827" unit="人" change="+14.7%" tone="orange" />
+          </div>
+
+          <div className="design-preview-grid">
+            <article className="approval-detail-panel design-sample-panel">
+              <div className="approval-detail-head">
+                <div><span className="section-kicker">REQUEST #1</span><h3>A0 → A1 新手成长计划</h3><p>活动发布 · 申请人 杨翘楚</p></div>
+                <span className="risk-tag high"><AlertTriangle size={13} /> 高风险</span>
+              </div>
+              <div className="approval-flow">
+                <span className="done"><Check size={13} /> 发起申请</span>
+                <i />
+                <span className="current">负责人审批</span>
+                <i />
+                <span>按计划生效</span>
+              </div>
+              <div className="check-list">
+                <span><CheckCircle2 size={15} /> 白名单权限校验通过</span>
+                <span className="warning"><AlertTriangle size={15} /> 超过单活动默认积分阈值</span>
+              </div>
+            </article>
+
+            <article className="design-sample-panel">
+              <div className="panel-head">
+                <div><span className="section-kicker">CONTROL SAMPLE</span><h3>按钮与标签</h3></div>
+              </div>
+              <div className="design-button-row">
+                <button className="primary-button"><Check size={15} /> 通过并生效</button>
+                <button className="secondary-button"><Settings2 size={15} /> 调整配置</button>
+                <button className="reject-button"><X size={15} /> 驳回</button>
+              </div>
+              <div className="design-chip-row">
+                <StatusTag status="进行中" />
+                <StatusTag status="待审批" />
+                <ActivityTypeTag type="任务类" />
+                <ActivityTypeTag type="排位赛" />
+              </div>
+              <pre className="design-settings-output">{cssSnapshot}</pre>
+            </article>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
+function DesignSlider({
+  label,
+  value,
+  min,
+  max,
+  suffix,
+  onChange,
+}: {
+  label: string
+  value: number
+  min: number
+  max: number
+  suffix: string
+  onChange: (value: number) => void
+}) {
+  return (
+    <label className="design-slider">
+      <span>
+        <strong>{label}</strong>
+        <em>{value}{suffix}</em>
+      </span>
+      <input
+        type="range"
+        min={min}
+        max={max}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+      />
+    </label>
+  )
+}
+
 function Dashboard({
   activities,
   setPage,
@@ -386,20 +731,78 @@ function Dashboard({
   activities: ActivityItem[]
   setPage: (page: PageKey) => void
 }) {
+  const runningActivities = activities.filter((item) => item.status === '进行中')
+  const approvalActivities = activities.filter((item) => item.status === '待审批')
+  const nextMilestones = [
+    { label: '今天', title: 'Seedance 2.0 尝鲜季第 3 批发放', meta: '960 UID · 预计 96,000 积分', tone: 'mint' },
+    { label: '明天', title: '618 模型限时 8 折开始预热', meta: '活动前检查 4 项配置', tone: 'cyan' },
+    { label: '本周', title: '美妆排位赛进入冲榜期', meta: 'Top 100 差距扩大到 18.4%', tone: 'orange' },
+  ]
+
   return (
     <div className="dashboard-page page-enter">
-      <section className="hero-grid">
-        <article className="north-star-card">
-          <div className="north-star-main">
-            <div>
-              <p>近7天活动牵引消耗</p>
-              <h2>¥ 1,842,680</h2>
-              <span className="metric-change positive"><ArrowUpRight size={14} /> 23.8% 较上周期</span>
+      <section className="operation-brief" aria-label="今日积分账本">
+        <article className="brief-hero">
+          <div className="brief-copy">
+            <div className="brief-title-row">
+              <span className="section-kicker light">MAGIC LEDGER</span>
+              <span className="mascot-sticker" aria-hidden="true"><i /><b>PF</b></span>
             </div>
-            <MiniLineChart />
+            <h2>今日积分账本</h2>
+            <p>把预算、审批和排期摊成一页小账本；先处理 1 个高风险审批，再推进本周排位赛冲榜。</p>
+            <div className="brief-sticker-row" aria-label="今日关键状态">
+              <span>预算安全区</span>
+              <span>1 个待审批</span>
+              <span>2 场进行中</span>
+            </div>
+            <div className="brief-action-row">
+              <button className="primary-button" onClick={() => setPage('approvals')}><ShieldCheck size={16} /> 处理审批</button>
+              <button className="brief-link-button" onClick={() => setPage('activities')}>查看活动节奏 <ArrowRight size={15} /></button>
+            </div>
+          </div>
+          <div className="brief-meter" role="img" aria-label="本月积分池已锁定 68%，剩余 63.8 万积分">
+            <span className="ledger-ticket" aria-hidden="true">积分饼干罐</span>
+            <div className="budget-dial">
+              <strong>68%</strong>
+              <span>预算锁定</span>
+            </div>
+            <div>
+              <span className="soft-label"><Activity size={14} /> 本月积分池</span>
+              <h3>剩余 63.8 万</h3>
+              <p>预算占用可控，新增活动需关注 30 万单活动阈值。</p>
+              <div className="allocation-bars" aria-hidden="true">
+                <i style={{ width: '46%' }} />
+                <i style={{ width: '22%' }} />
+                <i style={{ width: '32%' }} />
+              </div>
+            </div>
           </div>
         </article>
 
+        <aside className="brief-queue">
+          <div className="brief-queue-head">
+            <span className="section-kicker">TODAY</span>
+            <strong>{runningActivities.length} 场进行中</strong>
+          </div>
+          <div className="queue-pet-card" aria-hidden="true">
+            <span>今日桌面</span>
+            <strong>3 枚任务贴纸已摆好</strong>
+          </div>
+          <button className="brief-alert" onClick={() => setPage('approvals')}>
+            <span className="summary-icon orange"><AlertTriangle size={17} /></span>
+            <span><strong>{approvalActivities.length} 个配置待审批</strong><small>其中 1 个超过默认积分阈值</small></span>
+            <ArrowRight size={15} />
+          </button>
+          <div className="milestone-list">
+            {nextMilestones.map((item) => (
+              <span className={`milestone ${item.tone}`} key={item.title}>
+                <em>{item.label}</em>
+                <strong>{item.title}</strong>
+                <small>{item.meta}</small>
+              </span>
+            ))}
+          </div>
+        </aside>
       </section>
 
       <section className="metric-grid">
@@ -417,9 +820,9 @@ function Dashboard({
               <h3>活动排期</h3>
             </div>
             <div className="calendar-actions">
-              <button className="icon-button small"><ChevronLeft size={16} /></button>
+              <button className="icon-button small" aria-label="查看上一周排期"><ChevronLeft size={16} /></button>
               <span>2026年 6月 22日 — 28日</span>
-              <button className="icon-button small"><ChevronRight size={16} /></button>
+              <button className="icon-button small" aria-label="查看下一周排期"><ChevronRight size={16} /></button>
               <button className="text-button" onClick={() => setPage('activities')}>查看全部 <ArrowRight size={14} /></button>
             </div>
           </div>
@@ -438,14 +841,14 @@ function Dashboard({
             <button className="text-button" onClick={() => setPage('activities')}>管理活动 <ArrowRight size={14} /></button>
           </div>
           <div className="live-activities">
-            {activities.filter((item) => item.status === '进行中').map((item) => (
+            {runningActivities.map((item) => (
               <div className="live-activity-row" key={item.id}>
                 <span className={`activity-monogram ${item.accent}`}>{item.type === '排位赛' ? <Trophy size={18} /> : <WandSparkles size={18} />}</span>
                 <div className="live-name"><strong>{item.name}</strong><small>{item.range}</small></div>
                 <div className="live-data"><small>参与人数</small><strong>{item.people}</strong></div>
                 <div className="live-data"><small>已发积分</small><strong>{item.points}</strong></div>
                 <div className="progress-cell"><div><span style={{ width: `${item.progress}%` }} /></div><small>{item.progress}%</small></div>
-                <button className="ghost-icon"><MoreHorizontal size={17} /></button>
+                <button className="ghost-icon" aria-label={`${item.name} 更多操作`}><MoreHorizontal size={17} /></button>
               </div>
             ))}
           </div>
@@ -457,7 +860,7 @@ function Dashboard({
               <span className="section-kicker">CUSTOMER LAYERS</span>
               <h3>分层近7天活动表现</h3>
             </div>
-            <button className="ghost-icon"><MoreHorizontal size={18} /></button>
+            <button className="ghost-icon" aria-label="分层表现更多操作"><MoreHorizontal size={18} /></button>
           </div>
           <div className="layer-matrix">
             <div className="layer-matrix-head">
@@ -576,7 +979,7 @@ function MetricCard({
   tone: string
 }) {
   return (
-    <article className="metric-card">
+    <article className={`metric-card metric-card-${tone}`}>
       <div className={`metric-icon ${tone}`}><Icon size={18} /></div>
       <div className="metric-copy">
         <span>{label}</span>
@@ -589,8 +992,8 @@ function MetricCard({
 
 function MiniLineChart() {
   return (
-    <div className="mini-chart" aria-label="近30天活动牵引消耗趋势图">
-      <svg viewBox="0 0 340 130" preserveAspectRatio="none">
+    <div className="mini-chart" role="img" aria-label="近30天活动牵引消耗趋势图">
+      <svg viewBox="0 0 340 130" preserveAspectRatio="none" aria-hidden="true">
         <defs>
           <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#b8adff" stopOpacity=".5" />
@@ -611,7 +1014,7 @@ function ActivityCalendar() {
     ['一', '22'], ['二', '23'], ['三', '24'], ['四', '25'], ['五', '26'], ['六', '27'], ['日', '28'],
   ]
   return (
-    <div className="calendar-grid">
+    <div className="calendar-grid" role="img" aria-label="2026年6月22日至28日活动排期">
       <div className="calendar-corner">全天</div>
       {days.map(([week, date]) => <div className={`calendar-day ${date === '23' ? 'today' : ''}`} key={date}><small>周{week}</small><strong>{date}</strong></div>)}
       <div className="calendar-label">体验任务</div>
@@ -649,7 +1052,7 @@ function ActivitiesPage({ activities, onCreate }: { activities: ActivityItem[]; 
         <div className="table-toolbar">
           <div className="filter-tabs">
             {(['全部', '进行中', '待开始', '待审批', '已结束'] as const).map((item) => (
-              <button className={filter === item ? 'active' : ''} key={item} onClick={() => setFilter(item)}>{item}<span>{item === '全部' ? activities.length : activities.filter((a) => a.status === item).length}</span></button>
+              <button className={filter === item ? 'active' : ''} key={item} onClick={() => setFilter(item)} aria-pressed={filter === item}>{item}<span>{item === '全部' ? activities.length : activities.filter((a) => a.status === item).length}</span></button>
             ))}
           </div>
           <div className="table-tools">
@@ -668,6 +1071,7 @@ function ActivitiesPage({ activities, onCreate }: { activities: ActivityItem[]; 
               key={item.id}
               role="button"
               tabIndex={0}
+              aria-label={`查看${item.name}详情`}
               onClick={() => setSelectedActivity(item)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
@@ -687,7 +1091,7 @@ function ActivitiesPage({ activities, onCreate }: { activities: ActivityItem[]; 
             </div>
           ))}
         </div>
-        <div className="table-footer"><span>共 {shown.length} 个活动</span><div><button disabled><ChevronLeft size={15} /></button><button className="active">1</button><button disabled><ChevronRight size={15} /></button></div></div>
+        <div className="table-footer"><span>共 {shown.length} 个活动</span><div><button disabled aria-label="上一页"><ChevronLeft size={15} /></button><button className="active" aria-label="第 1 页">1</button><button disabled aria-label="下一页"><ChevronRight size={15} /></button></div></div>
       </section>
     </div>
   )
@@ -904,7 +1308,7 @@ function getActivityDetail(activity: ActivityItem) {
       entry: '活动期使用指定模型或工具',
       rewardMode: '按折扣价实时扣减',
       guardrail: '折扣成本每日封顶',
-      progressNote: activity.status === '已结束' ? '已完成复盘数据沉淀' : '待活动开始后采集数据',
+      progressNote: activity.status === '已结束' ? '已完成历史数据沉淀' : '待活动开始后采集数据',
       reached: activity.status === '已结束' ? '2,106 UID' : '预计 1,200 UID',
       issuedUid: activity.status === '已结束' ? '2,106' : '0',
       consumption: activity.status === '已结束' ? '¥298,700' : '¥180,000',
@@ -965,23 +1369,41 @@ function RulesPage({ notify }: { notify: (message: string) => void }) {
   const [modal, setModal] = useState<'return' | 'expiry' | 'price' | null>(null)
   const [returnRate, setReturnRate] = useState('10')
   const [expiry, setExpiry] = useState('30')
+  const [priceModalStep, setPriceModalStep] = useState<'select' | 'configure'>('select')
+  const scopeOptions = ['AI原料生成', 'Agent成片', '数字人']
   const pricingModels = [
-    { name: 'Seedance 2.0 Pro', capability: '视频生成', current: '60', previous: '—', unit: '积分 / 次', effective: '2026-06-20', status: '新上线', logo: 'm1', draft: '58', impact: '预计影响新模型尝鲜客户，日均少消耗 3.1 万积分。' },
-    { name: 'Seedance 1.5 Pro', capability: '视频生成', current: '48', previous: '52', unit: '积分 / 次', effective: '2026-06-01', status: '生效中', logo: 'm2', draft: '46', impact: '预计影响存量视频生成客户，日均少消耗 4.6 万积分。' },
-    { name: 'Seedream 4.0', capability: '图片生成', current: '45', previous: '45', unit: '积分 / 次', effective: '2026-05-12', status: '待变更', logo: 'm3', draft: '38', impact: '该变更将影响全部客户，预计日均少消耗 7.2 万积分。' },
-    { name: '数字人 Pro', capability: '视频工具', current: '80', previous: '80', unit: '积分 / 分钟', effective: '2026-04-18', status: '生效中', logo: 'm4', draft: '76', impact: '预计影响数字人工具客户，日均少消耗 2.8 万积分。' },
+    { name: 'Seedance 2.0', capability: '视频生成', current: '60', previous: '—', unit: '积分 / 次', effective: '2026-06-20', status: '新上线', logo: 'm1', draft: '58', scope: ['AI原料生成', 'Agent成片'] },
+    { name: 'Seedance 1.5', capability: '视频生成', current: '48', previous: '52', unit: '积分 / 次', effective: '2026-06-01', status: '生效中', logo: 'm2', draft: '46', scope: ['AI原料生成', 'Agent成片'] },
+    { name: 'Seedance 1.0', capability: '视频生成', current: '36', previous: '40', unit: '积分 / 次', effective: '2026-05-12', status: '待变更', logo: 'm3', draft: '32', scope: ['AI原料生成', 'Agent成片'] },
   ]
-  const [selectedPricingModel, setSelectedPricingModel] = useState('Seedream 4.0')
-  const [priceDraft, setPriceDraft] = useState('38')
-  const activePricingModel = pricingModels.find((item) => item.name === selectedPricingModel) ?? pricingModels[2]
-  const openPriceModal = (modelName = 'Seedream 4.0') => {
-    const model = pricingModels.find((item) => item.name === modelName) ?? pricingModels[2]
-    setSelectedPricingModel(model.name)
-    setPriceDraft(model.draft)
+  const [selectedPricingModel, setSelectedPricingModel] = useState<string | null>(null)
+  const [priceDraft, setPriceDraft] = useState('')
+  const [selectedScopes, setSelectedScopes] = useState<string[]>([])
+  const activePricingModel = pricingModels.find((item) => item.name === selectedPricingModel) ?? pricingModels[0]
+  const closeModal = () => {
+    setModal(null)
+    setPriceModalStep('select')
+  }
+  const openPriceModal = (modelName?: string) => {
+    const model = modelName ? pricingModels.find((item) => item.name === modelName) : null
+    setSelectedPricingModel(model?.name ?? null)
+    setPriceDraft(model?.draft ?? '')
+    setSelectedScopes(model?.scope ?? [])
+    setPriceModalStep('select')
     setModal('price')
   }
+  const choosePricingModel = (modelName: string) => {
+    const model = pricingModels.find((item) => item.name === modelName) ?? pricingModels[0]
+    setSelectedPricingModel(model.name)
+    setPriceDraft(model.draft)
+    setSelectedScopes(model.scope)
+    setPriceModalStep('configure')
+  }
+  const togglePricingScope = (scope: string) => {
+    setSelectedScopes((current) => current.includes(scope) ? current.filter((item) => item !== scope) : [...current, scope])
+  }
   const saveRule = () => {
-    setModal(null)
+    closeModal()
     notify('规则变更已提交审批，审批通过后按计划生效')
   }
   return (
@@ -1012,50 +1434,66 @@ function RulesPage({ notify }: { notify: (message: string) => void }) {
       <section className="panel pricing-panel">
         <div className="panel-head">
           <div><span className="section-kicker">MODEL PRICING</span><h3>模型定价一览</h3></div>
-          <div className="pricing-tools"><label className="inline-search"><Search size={15} /><input placeholder="搜索模型" /></label><button className="secondary-button"><History size={15} /> 变更记录</button></div>
+          <div className="pricing-tools"><label className="inline-search"><Search size={15} /><input aria-label="搜索模型" placeholder="搜索模型" /></label><button className="secondary-button"><History size={15} /> 变更记录</button></div>
         </div>
         <div className="data-table pricing-table">
           <div className="data-row data-head"><span>模型 / SKU</span><span>能力类型</span><span>当前定价</span><span>上一版定价</span><span>生效时间</span><span>状态</span><span /></div>
-          {pricingModels.map((model) => <div className="data-row" key={model.name}><span className="model-cell"><i className={`model-logo ${model.logo}`}><Sparkles size={15} /></i><strong>{model.name}</strong></span><span className="muted-cell">{model.capability}</span><span className="table-number">{model.current} {model.unit}</span><span className="muted-cell">{model.previous === '—' ? '—' : `${model.previous} ${model.unit}`}</span><span className="muted-cell">{model.effective}</span><span><span className={`simple-status ${model.status === '待变更' ? 'pending' : model.status === '新上线' ? 'new' : ''}`}>{model.status}</span></span><span><button className="ghost-icon" onClick={() => openPriceModal(model.name)}><MoreHorizontal size={17} /></button></span></div>)}
+          {pricingModels.map((model) => <div className="data-row" key={model.name}><span className="model-cell"><i className={`model-logo ${model.logo}`}><Sparkles size={15} /></i><strong>{model.name}</strong></span><span className="muted-cell">{model.capability}</span><span className="table-number">{model.current} {model.unit}</span><span className="muted-cell">{model.previous === '—' ? '—' : `${model.previous} ${model.unit}`}</span><span className="muted-cell">{model.effective}</span><span><span className={`simple-status ${model.status === '待变更' ? 'pending' : model.status === '新上线' ? 'new' : ''}`}>{model.status}</span></span><span><button className="ghost-icon" aria-label={`调整${model.name}定价`} onClick={() => openPriceModal(model.name)}><MoreHorizontal size={17} /></button></span></div>)}
         </div>
       </section>
       {modal && (
-        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && setModal(null)}>
-          <div className="rule-modal">
-            <div className="modal-header"><div><span className="section-kicker">CHANGE REQUEST</span><h2>{modal === 'return' ? '调整消耗返还比例' : modal === 'expiry' ? '调整积分有效期' : '调整模型定价'}</h2></div><button className="icon-button" onClick={() => setModal(null)}><X size={18} /></button></div>
+        <div className="modal-backdrop" onMouseDown={(e) => e.target === e.currentTarget && closeModal()}>
+          <div className="rule-modal" role="dialog" aria-modal="true" aria-labelledby="rule-modal-title">
+            <div className="modal-header"><div><span className="section-kicker">CHANGE REQUEST</span><h2 id="rule-modal-title">{modal === 'return' ? '调整消耗返还比例' : modal === 'expiry' ? '调整积分有效期' : priceModalStep === 'select' ? '选择定价模型' : '调整模型定价'}</h2></div><button className="icon-button" aria-label="关闭规则调整弹窗" onClick={closeModal}><X size={18} /></button></div>
             <div className="rule-modal-body">
-              {modal === 'price' ? (
-                <>
-                  <div className="form-group">
-                    <label>选择模型 <em>*</em></label>
-                    <div className="pricing-model-selector">
-                      {pricingModels.map((model) => (
-                        <button className={activePricingModel.name === model.name ? 'active' : ''} key={model.name} onClick={() => { setSelectedPricingModel(model.name); setPriceDraft(model.draft) }}>
-                          <i className={`model-logo ${model.logo}`}><Sparkles size={14} /></i>
-                          <span>
-                            <strong>{model.name}</strong>
-                            <small>{model.capability} · 当前 {model.current} {model.unit}</small>
-                          </span>
-                          <em>{activePricingModel.name === model.name && <Check size={13} />}</em>
-                        </button>
-                      ))}
-                    </div>
+              {modal === 'price' && priceModalStep === 'select' && (
+                <div className="pricing-select-step">
+                  <div className="pricing-model-selector">
+                    {pricingModels.map((model) => (
+                      <button className={selectedPricingModel === model.name ? 'active' : ''} key={model.name} onClick={() => choosePricingModel(model.name)}>
+                        <i className={`model-logo ${model.logo}`}><Sparkles size={14} /></i>
+                        <span>
+                          <strong>{model.name}</strong>
+                          <small>{model.capability} · 当前 {model.current} {model.unit}</small>
+                        </span>
+                        <em>{selectedPricingModel === model.name && <Check size={13} />}</em>
+                      </button>
+                    ))}
                   </div>
-                  <div className="selected-model-summary">
-                    <span><small>当前定价</small><strong>{activePricingModel.current} {activePricingModel.unit}</strong></span>
-                    <span><small>上一版定价</small><strong>{activePricingModel.previous === '—' ? '暂无' : `${activePricingModel.previous} ${activePricingModel.unit}`}</strong></span>
-                    <span><small>当前状态</small><strong>{activePricingModel.status}</strong></span>
+                </div>
+              )}
+              {modal === 'price' && priceModalStep === 'configure' && (
+                <>
+                  <div className="selected-pricing-card">
+                    <i className={`model-logo ${activePricingModel.logo}`}><Sparkles size={15} /></i>
+                    <div>
+                      <strong>{activePricingModel.name}</strong>
+                      <small>当前定价：{activePricingModel.current} {activePricingModel.unit}</small>
+                    </div>
+                    <button onClick={() => setPriceModalStep('select')}><ChevronLeft size={13} /> 重新选择</button>
                   </div>
                   <div className="form-group"><label>{activePricingModel.name} 新定价 <em>*</em></label><div className="suffix-input"><input type="number" value={priceDraft} onChange={(e) => setPriceDraft(e.target.value)} /><span>{activePricingModel.unit}</span></div></div>
+                  <div className="time-range-grid">
+                    <div className="form-group"><label>生效时间</label><input className="plain-input" type="datetime-local" defaultValue="2026-06-26T00:00" /></div>
+                    <div className="form-group"><label>失效时间</label><input className="plain-input" type="datetime-local" defaultValue="2026-07-26T00:00" /></div>
+                  </div>
+                  <div className="form-group"><label>适用范围</label><div className="scope-picker">{scopeOptions.map((scope) => <button type="button" className={selectedScopes.includes(scope) ? 'active' : ''} key={scope} onClick={() => togglePricingScope(scope)} aria-pressed={selectedScopes.includes(scope)}>{selectedScopes.includes(scope) && <Check size={12} />}{scope}</button>)}</div></div>
+                  <div className="form-group"><label>变更原因</label><textarea placeholder="请说明变更背景和预期效果" defaultValue="配合新一阶段积分运营策略调整" /></div>
                 </>
-              ) : (
-                <div className="form-group"><label>{modal === 'return' ? '新返还比例' : '新有效期'}</label><div className="suffix-input"><input type="number" value={modal === 'return' ? returnRate : expiry} onChange={(e) => modal === 'return' ? setReturnRate(e.target.value) : setExpiry(e.target.value)} /><span>{modal === 'return' ? '%' : '天'}</span></div></div>
               )}
-              <div className="impact-preview"><AlertTriangle size={18} /><div><strong>影响预估</strong><p>{modal === 'price' ? activePricingModel.impact : '该规则为全局机制，变更后将影响所有新到账积分。'}</p></div></div>
-              <div className="form-group"><label>生效时间</label><input className="plain-input" type="datetime-local" defaultValue="2026-06-26T00:00" /></div>
-              <div className="form-group"><label>变更原因</label><textarea placeholder="请说明变更背景和预期效果" defaultValue="配合新一阶段积分运营策略调整" /></div>
+              {modal !== 'price' && (
+                <>
+                  <div className="form-group"><label>{modal === 'return' ? '新返还比例' : '新有效期'}</label><div className="suffix-input"><input type="number" value={modal === 'return' ? returnRate : expiry} onChange={(e) => modal === 'return' ? setReturnRate(e.target.value) : setExpiry(e.target.value)} /><span>{modal === 'return' ? '%' : '天'}</span></div></div>
+                  <div className="impact-preview"><AlertTriangle size={18} /><div><strong>影响预估</strong><p>该规则为全局机制，变更后将影响所有新到账积分。</p></div></div>
+                  <div className="form-group"><label>生效时间</label><input className="plain-input" type="datetime-local" defaultValue="2026-06-26T00:00" /></div>
+                  <div className="form-group"><label>变更原因</label><textarea placeholder="请说明变更背景和预期效果" defaultValue="配合新一阶段积分运营策略调整" /></div>
+                </>
+              )}
             </div>
-            <div className="modal-footer"><button className="secondary-button" onClick={() => setModal(null)}>取消</button><button className="primary-button" onClick={saveRule}><ShieldCheck size={16} /> 提交审批</button></div>
+            <div className="modal-footer">
+              <button className="secondary-button" onClick={closeModal}>取消</button>
+              {!(modal === 'price' && priceModalStep === 'select') && <button className="primary-button" onClick={saveRule}><ShieldCheck size={16} /> 提交审批</button>}
+            </div>
           </div>
         </div>
       )}
@@ -1071,10 +1509,10 @@ function ApprovalsPage({ approvals, onDecision }: { approvals: Approval[]; onDec
   return (
     <div className="page-enter approval-layout">
       <section className="panel approval-list-panel">
-        <div className="approval-tabs"><button className={filter === '待处理' ? 'active' : ''} onClick={() => setFilter('待处理')}>待我审批 <span>{approvals.filter((a) => a.status === '待处理').length}</span></button><button className={filter === '已处理' ? 'active' : ''} onClick={() => setFilter('已处理')}>已处理</button></div>
+        <div className="approval-tabs"><button className={filter === '待处理' ? 'active' : ''} onClick={() => setFilter('待处理')} aria-pressed={filter === '待处理'}>待我审批 <span>{approvals.filter((a) => a.status === '待处理').length}</span></button><button className={filter === '已处理' ? 'active' : ''} onClick={() => setFilter('已处理')} aria-pressed={filter === '已处理'}>已处理</button></div>
         <div className="approval-items">
           {shown.map((item) => (
-            <button key={item.id} className={active?.id === item.id ? 'active' : ''} onClick={() => setSelected(item.id)}>
+            <button key={item.id} className={active?.id === item.id ? 'active' : ''} onClick={() => setSelected(item.id)} aria-pressed={active?.id === item.id}>
               <div className="approval-item-top"><span className={`risk-tag ${item.risk === '高风险' ? 'high' : ''}`}>{item.risk}</span><small>{item.time}</small></div>
               <strong>{item.title}</strong>
               <p>{item.kind} · 申请人 {item.applicant}</p>
@@ -1099,39 +1537,6 @@ function ApprovalsPage({ approvals, onDecision }: { approvals: Approval[]; onDec
       </section>
     </div>
   )
-}
-
-function ReportsPage() {
-  const [selected, setSelected] = useState(0)
-  const reports = [
-    { name: '一键同款积分加倍周', type: '定价折扣', score: 88, date: '6月2日 — 6月8日', lift: '+31.6%', people: '2,106' },
-    { name: 'AIGC 成片投放挑战', type: '任务类', score: 81, date: '5月15日 — 5月29日', lift: '+24.8%', people: '1,642' },
-    { name: '游戏行业创意排位赛', type: '排位赛', score: 74, date: '5月1日 — 5月14日', lift: '+18.2%', people: '836' },
-  ]
-  const report = reports[selected]
-  return (
-    <div className="page-enter reports-page">
-      <section className="report-list">
-        <div className="report-list-head"><span>已生成报告</span><strong>{reports.length}</strong></div>
-        {reports.map((item, i) => <button className={selected === i ? 'active' : ''} key={item.name} onClick={() => setSelected(i)}><div><strong>{item.name}</strong><small>{item.type} · {item.date}</small></div><span>{item.score}<small>分</small></span></button>)}
-      </section>
-      <section className="panel report-detail">
-        <div className="report-cover">
-          <div><span className="section-kicker light">AUTO REVIEW · NO. 026</span><h2>{report.name}</h2><p>{report.date} · 系统于活动结束后自动生成</p></div>
-          <div className="report-score"><strong>{report.score}</strong><span>综合评分</span></div>
-        </div>
-        <div className="report-metrics"><div><small>参与 UID</small><strong>{report.people}</strong><span className="positive"><ArrowUpRight size={13} /> 19.4%</span></div><div><small>累计发放积分</small><strong>168,400</strong><span>预算使用率 84.2%</span></div><div><small>活动期消耗拉动</small><strong>{report.lift}</strong><span className="positive">高于预期 8.6 pp</span></div><div><small>首周留存</small><strong>62.8%</strong><span className="negative"><ArrowDownRight size={13} /> 2.1 pp</span></div></div>
-        <div className="report-content-grid">
-          <div className="report-chart-card"><div className="card-title-row"><div><span className="section-kicker">CONSUMPTION LIFT</span><h3>活动前后消耗趋势</h3></div><span className="legend"><i /> 活动客户 <i /> 对照组</span></div><ReportChart /></div>
-          <div className="report-insights"><span className="section-kicker">AI INSIGHTS</span><h3>本期洞察</h3><div className="insight-card good"><span><Sparkles size={16} /></span><p><strong>A1 客户转化显著</strong>该分层贡献 42% 的增量消耗，完成任务后的次周留存达到 71%。</p></div><div className="insight-card watch"><span><AlertTriangle size={16} /></span><p><strong>A2 客户 NPS 下滑</strong>负向反馈集中在“奖励到账延迟”，建议发放 SLA 缩短至 10 分钟。</p></div><button>查看完整归因分析 <ArrowRight size={15} /></button></div>
-        </div>
-      </section>
-    </div>
-  )
-}
-
-function ReportChart() {
-  return <div className="report-chart"><div className="chart-y-labels"><span>40万</span><span>30万</span><span>20万</span><span>10万</span><span>0</span></div><svg viewBox="0 0 720 230" preserveAspectRatio="none"><g stroke="#e8e9f0" strokeWidth="1"><line x1="0" y1="10" x2="720" y2="10"/><line x1="0" y1="65" x2="720" y2="65"/><line x1="0" y1="120" x2="720" y2="120"/><line x1="0" y1="175" x2="720" y2="175"/><line x1="0" y1="229" x2="720" y2="229"/></g><path d="M0 180 C80 175 112 154 170 160 S270 150 330 130 S430 70 500 58 S630 46 720 25" fill="none" stroke="#5c52e7" strokeWidth="4" strokeLinecap="round"/><path d="M0 190 C70 188 110 177 180 180 S300 170 370 165 S480 151 555 145 S660 138 720 132" fill="none" stroke="#aeb4c5" strokeWidth="3" strokeDasharray="7 8" strokeLinecap="round"/><line x1="310" y1="0" x2="310" y2="230" stroke="#f09c57" strokeDasharray="4 5"/><text x="320" y="18" fill="#a66031" fontSize="12">活动开始</text></svg><div className="chart-x-labels"><span>5/19</span><span>5/26</span><span>6/2</span><span>6/9</span><span>6/16</span></div></div>
 }
 
 function RiskPage({ notify }: { notify: (message: string) => void }) {
@@ -1187,14 +1592,14 @@ function ActivityWizard({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
   })
   return (
     <div className="wizard-backdrop">
-      <div className="wizard-drawer" data-testid="activity-wizard">
-        <header className="wizard-header"><div><span className="section-kicker">CREATE CAMPAIGN</span><h2>新建积分活动</h2></div><button className="icon-button" onClick={onClose} aria-label="关闭"><X size={19} /></button></header>
+      <div className="wizard-drawer" data-testid="activity-wizard" role="dialog" aria-modal="true" aria-labelledby="activity-wizard-title">
+        <header className="wizard-header"><div><span className="section-kicker">CREATE CAMPAIGN</span><h2 id="activity-wizard-title">新建积分活动</h2></div><button className="icon-button" onClick={onClose} aria-label="关闭"><X size={19} /></button></header>
         <div className="wizard-stepper">{[['1','选择类型'],['2','基本信息'],['3','范围与规则'],['4','预览发布']].map(([n,label],i) => <div className={step > i + 1 ? 'done' : step === i + 1 ? 'active' : ''} key={n}><span>{step > i + 1 ? <Check size={14}/> : n}</span><small>{label}</small>{i < 3 && <i />}</div>)}</div>
         <div className="wizard-body">
           {step === 1 && <div className="wizard-section"><div className="section-intro"><h3>这次想用什么玩法？</h3><p>选择最接近目标的活动类型，后续仍可调整具体规则。</p></div><div className="activity-type-grid">
-            <button className={type === '任务类' ? 'selected' : ''} onClick={() => setType('任务类')}><span className="type-art task"><WandSparkles size={24}/></span><div><strong>任务类</strong><p>完成指定动作自动发积分，适合新手、成长与功能体验。</p><small>新手任务 · 成长任务 · 体验任务</small></div><i>{type === '任务类' && <Check size={14}/>}</i></button>
-            <button className={type === '排位赛' ? 'selected' : ''} onClick={() => setType('排位赛')}><span className="type-art race"><Trophy size={24}/></span><div><strong>排位赛</strong><p>按消耗、生成量或使用量排名，适合分层客户拉升。</p><small>行业赛 · 分层赛 · 创意评选</small></div><i>{type === '排位赛' && <Check size={14}/>}</i></button>
-            <button className={type === '定价折扣' ? 'selected' : ''} onClick={() => setType('定价折扣')}><span className="type-art discount"><Zap size={24}/></span><div><strong>定价折扣</strong><p>限时折扣或多倍积分，用于新模型推广与节点促销。</p><small>模型折扣 · 积分多倍</small></div><i>{type === '定价折扣' && <Check size={14}/>}</i></button>
+            <button className={type === '任务类' ? 'selected' : ''} onClick={() => setType('任务类')} aria-pressed={type === '任务类'}><span className="type-art task"><WandSparkles size={24}/></span><div><strong>任务类</strong><p>完成指定动作自动发积分，适合新手、成长与功能体验。</p><small>新手任务 · 成长任务 · 体验任务</small></div><i>{type === '任务类' && <Check size={14}/>}</i></button>
+            <button className={type === '排位赛' ? 'selected' : ''} onClick={() => setType('排位赛')} aria-pressed={type === '排位赛'}><span className="type-art race"><Trophy size={24}/></span><div><strong>排位赛</strong><p>按消耗、生成量或使用量排名，适合分层客户拉升。</p><small>行业赛 · 分层赛 · 创意评选</small></div><i>{type === '排位赛' && <Check size={14}/>}</i></button>
+            <button className={type === '定价折扣' ? 'selected' : ''} onClick={() => setType('定价折扣')} aria-pressed={type === '定价折扣'}><span className="type-art discount"><Zap size={24}/></span><div><strong>定价折扣</strong><p>限时折扣或多倍积分，用于新模型推广与节点促销。</p><small>模型折扣 · 积分多倍</small></div><i>{type === '定价折扣' && <Check size={14}/>}</i></button>
           </div></div>}
           {step === 2 && <div className="wizard-section"><div className="section-intro"><h3>填写基本信息</h3><p>这些信息会用于活动管理、审批和自动生成通知。</p></div><div className="form-grid"><div className="form-group full"><label>活动名称 <em>*</em></label><input className="plain-input" value={name} onChange={(e)=>setName(e.target.value)} /></div><div className="form-group"><label>开始时间 <em>*</em></label><input className="plain-input" type="datetime-local" defaultValue="2026-07-01T00:00" /></div><div className="form-group"><label>结束时间 <em>*</em></label><input className="plain-input" type="datetime-local" defaultValue="2026-07-31T23:59" /></div><div className="form-group"><label>积分预算 <em>*</em></label><div className="suffix-input"><input type="number" value={budget} onChange={(e)=>setBudget(e.target.value)}/><span>积分</span></div><small className="field-hint">单活动超过 300,000 积分将标记为高风险</small></div><div className="form-group"><label>活动目标</label><select defaultValue="新客培养"><option>新客培养</option><option>客户消耗拉升</option><option>新模型推广</option><option>沉默客户唤醒</option></select></div><div className="form-group full"><label>活动说明</label><textarea defaultValue="引导 A0 新客户在 3 天内完成首条素材生成与投放，完成后自动发放成长积分。" /></div></div></div>}
           {step === 3 && <div className="wizard-section">
@@ -1203,13 +1608,13 @@ function ActivityWizard({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
               <div className="audience-card-head">
                 <div><strong>目标人群</strong><small>选择一种或多种方式圈定本次活动参与客户</small></div>
                 <div className="audience-mode-tabs">
-                  {(['圈选客户', '上传UID名单'] as const).map((mode) => <button className={audienceMode === mode ? 'active' : ''} key={mode} onClick={() => setAudienceMode(mode)}>{mode}</button>)}
+                  {(['圈选客户', '上传UID名单'] as const).map((mode) => <button className={audienceMode === mode ? 'active' : ''} key={mode} onClick={() => setAudienceMode(mode)} aria-pressed={audienceMode === mode}>{mode}</button>)}
                 </div>
               </div>
               <div className="audience-method-grid">
                 <div>
                   <label>客户分层圈选</label>
-                  <div className="choice-pills">{['A0','A1','A2','A3','A4+'].map(x=><button className={segments.includes(x)?'active':''} key={x} onClick={()=>toggleSegment(x)}>{x}{segments.includes(x)&&<Check size={13}/>}</button>)}</div>
+                  <div className="choice-pills">{['A0','A1','A2','A3','A4+'].map(x=><button className={segments.includes(x)?'active':''} key={x} onClick={()=>toggleSegment(x)} aria-pressed={segments.includes(x)}>{x}{segments.includes(x)&&<Check size={13}/>}</button>)}</div>
                 </div>
                 <button className={`upload-dropzone ${audienceMode === '上传UID名单' ? 'active' : ''}`} onClick={() => setAudienceMode('上传UID名单')}>
                   <Upload size={18} />
@@ -1243,7 +1648,7 @@ function ActivityWizard({ onClose, onSubmit }: { onClose: () => void; onSubmit: 
               ))}
             </div>
           </div>}
-          {step === 4 && <div className="wizard-section preview-section"><div className="section-intro"><h3>确认无误，提交审批</h3><p>请核对活动人群、达标规则和积分发放配置，确认后提交审批。</p></div><div className="preview-hero"><div><ActivityTypeTag type={type}/><h3>{name}</h3><p>2026年7月1日 00:00 — 7月31日 23:59</p><div>{segments.map(x=><span key={x}>{x}</span>)}</div></div><span className="preview-budget"><small>积分预算</small><strong>{formatNumber(Number(budget || 0))}</strong><em>积分</em></span></div><div className="flow-preview">{[['运营配置',CheckCircle2],['负责人审批',ShieldCheck],['发布与通知',Bell],['识别并发放',Zap],['自动复盘',FileBarChart]].map(([label,Icon],i)=><div key={label as string}><span><Icon size={17}/></span><small>{label as string}</small>{i<4&&<i/>}</div>)}</div><div className="config-check-card"><div className="config-check-head"><ShieldCheck size={18}/><strong>活动配置核对</strong><span>{configuredRules.length} 条规则 · 预计锁定 {formatNumber(projected)} 积分</span></div><div className="config-check-summary"><span><CheckCircle2 size={15}/> 人群方式：{audienceMode}</span><span><CheckCircle2 size={15}/> 圈选层级：{segments.join('、')}</span><span><CheckCircle2 size={15}/> UID 发放上限：每条规则每 UID 一次</span><span className={Number(budget)>300000?'warn':''}>{Number(budget)>300000?<AlertTriangle size={15}/>:<CheckCircle2 size={15}/>} 积分预算：{formatNumber(Number(budget || 0))}</span></div><div className="rule-review-list">{configuredRules.map((rule) => <section key={rule.name}><div><strong>{rule.name}</strong><em>{rule.logic === '且' ? '满足全部条件' : '满足任一条件'} · 发放 {rule.reward}</em></div><ul>{rule.conditions.map((condition) => <li key={`${rule.name}-${condition[0]}`}>{condition[0]} {condition[1]} {condition[2]} {condition[3]}</li>)}</ul></section>)}</div></div></div>}
+          {step === 4 && <div className="wizard-section preview-section"><div className="section-intro"><h3>确认无误，提交审批</h3><p>请核对活动人群、达标规则和积分发放配置，确认后提交审批。</p></div><div className="preview-hero"><div><ActivityTypeTag type={type}/><h3>{name}</h3><p>2026年7月1日 00:00 — 7月31日 23:59</p><div>{segments.map(x=><span key={x}>{x}</span>)}</div></div><span className="preview-budget"><small>积分预算</small><strong>{formatNumber(Number(budget || 0))}</strong><em>积分</em></span></div><div className="flow-preview">{[['运营配置',CheckCircle2],['负责人审批',ShieldCheck],['发布与通知',Bell],['识别并发放',Zap],['执行归档',FileBarChart]].map(([label,Icon],i)=><div key={label as string}><span><Icon size={17}/></span><small>{label as string}</small>{i<4&&<i/>}</div>)}</div><div className="config-check-card"><div className="config-check-head"><ShieldCheck size={18}/><strong>活动配置核对</strong><span>{configuredRules.length} 条规则 · 预计锁定 {formatNumber(projected)} 积分</span></div><div className="config-check-summary"><span><CheckCircle2 size={15}/> 人群方式：{audienceMode}</span><span><CheckCircle2 size={15}/> 圈选层级：{segments.join('、')}</span><span><CheckCircle2 size={15}/> UID 发放上限：每条规则每 UID 一次</span><span className={Number(budget)>300000?'warn':''}>{Number(budget)>300000?<AlertTriangle size={15}/>:<CheckCircle2 size={15}/>} 积分预算：{formatNumber(Number(budget || 0))}</span></div><div className="rule-review-list">{configuredRules.map((rule) => <section key={rule.name}><div><strong>{rule.name}</strong><em>{rule.logic === '且' ? '满足全部条件' : '满足任一条件'} · 发放 {rule.reward}</em></div><ul>{rule.conditions.map((condition) => <li key={`${rule.name}-${condition[0]}`}>{condition[0]} {condition[1]} {condition[2]} {condition[3]}</li>)}</ul></section>)}</div></div></div>}
         </div>
         <footer className="wizard-footer"><button className="secondary-button" onClick={step === 1 ? onClose : () => setStep(step - 1)}>{step === 1 ? '取消' : <><ChevronLeft size={16}/> 上一步</>}</button><div><span>草稿自动保存</span>{step < 4 ? <button className="primary-button" onClick={() => setStep(step + 1)}>下一步 <ChevronRight size={16}/></button> : <button className="primary-button" onClick={submit} data-testid="submit-activity"><ShieldCheck size={16}/> 提交审批</button>}</div></footer>
       </div>
